@@ -82,7 +82,6 @@ public class FunctionCalculationUtil {
         int reachesMaximumDays = RealDamageConfig.REACHES_MAXIMUM_DAYS.get();
         // 获得最大真实伤害比例
         float damageProportionMax = RealDamageConfig.DAMAGE_PROPORTION_MAX.get() / 100F;
-        System.out.println(damageProportionMax);
 
         // 计算真实伤害数值
         float damageValue;

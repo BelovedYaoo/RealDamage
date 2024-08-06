@@ -113,7 +113,6 @@ public class RealDamageConfig {
     /**
      * 初始化配置项
      *
-     * @param file 配置项路径
      */
     public static void init() {
         CommentedFileConfig commentedFileConfig = CommentedFileConfig.builder(path).sync().autosave().writingMode(WritingMode.REPLACE).build();

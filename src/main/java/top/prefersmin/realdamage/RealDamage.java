@@ -5,7 +5,6 @@ import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.fml.ModLoadingContext;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
-import net.minecraftforge.fml.loading.FMLPaths;
 import top.prefersmin.realdamage.common.RealDamageCommon;
 import top.prefersmin.realdamage.config.RealDamageConfig;
 import top.prefersmin.realdamage.handler.RealDamageCalculationHandler;
