@@ -1,4 +1,4 @@
-package top.prefersmin.realdamage.config;
+package top.bemylover.realdamage.config;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
@@ -8,11 +8,11 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.config.ModConfig;
 import net.minecraftforge.fml.event.config.ModConfigEvent;
 import net.minecraftforge.fml.loading.FMLPaths;
-import top.prefersmin.realdamage.util.FunctionCalculationUtil;
+import top.bemylover.realdamage.util.FunctionCalculationUtil;
 
 import java.nio.file.Path;
 
-import static top.prefersmin.realdamage.RealDamage.MODID;
+import static top.bemylover.realdamage.RealDamage.MODID;
 
 @Mod.EventBusSubscriber(modid = MODID, bus = Mod.EventBusSubscriber.Bus.MOD)
 public class RealDamageConfig {

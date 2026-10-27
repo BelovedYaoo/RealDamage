@@ -1,10 +1,10 @@
-package top.prefersmin.realdamage.common;
+package top.bemylover.realdamage.common;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.context.CommandContext;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
-import top.prefersmin.realdamage.config.RealDamageConfig;
+import top.bemylover.realdamage.config.RealDamageConfig;
 
 /**
  * 命令注册

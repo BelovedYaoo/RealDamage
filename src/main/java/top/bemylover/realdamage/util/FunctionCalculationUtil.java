@@ -1,8 +1,8 @@
-package top.prefersmin.realdamage.util;
+package top.bemylover.realdamage.util;
 
 import ch.obermuhlner.math.big.BigComplex;
 import ch.obermuhlner.math.big.BigDecimalMath;
-import top.prefersmin.realdamage.config.RealDamageConfig;
+import top.bemylover.realdamage.config.RealDamageConfig;
 
 import java.math.BigDecimal;
 import java.math.MathContext;

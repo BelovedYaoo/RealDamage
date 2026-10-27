@@ -1,4 +1,4 @@
-package top.prefersmin.realdamage.handler;
+package top.bemylover.realdamage.handler;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.world.entity.player.Player;
@@ -6,9 +6,9 @@ import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.slf4j.Logger;
-import top.prefersmin.realdamage.RealDamage;
-import top.prefersmin.realdamage.config.RealDamageConfig;
-import top.prefersmin.realdamage.util.FunctionCalculationUtil;
+import top.bemylover.realdamage.RealDamage;
+import top.bemylover.realdamage.config.RealDamageConfig;
+import top.bemylover.realdamage.util.FunctionCalculationUtil;
 
 /**
  * 真实伤害计算
