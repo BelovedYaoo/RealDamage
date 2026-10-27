@@ -70,6 +70,11 @@ dependencies {
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'
 
     implementation 'ch.obermuhlner:big-math:2.3.2'
+    // big-math 是运行时必需的库，必须经 Jar-in-Jar 打进产物，
+    // 否则 FunctionCalculationUtil 加载时抛 NoClassDefFoundError
+    jarJar('ch.obermuhlner:big-math:[2.0,3.0)') {
+        jarJar.pin(it, '2.3.2')
+    }
 }
 
 tasks.named('processResources', ProcessResources).configure {
