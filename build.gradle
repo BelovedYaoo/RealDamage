@@ -93,6 +93,9 @@ tasks.named('processResources', ProcessResources).configure {
 }
 
 tasks.named('jar', Jar).configure {
+    // 薄 jar 仅供开发期依赖声明使用，加后缀以与可发货的完整产物区分
+    archiveClassifier = 'slim'
+
     manifest {
         attributes([
                 'Specification-Title'     : mod_id,
@@ -108,11 +111,17 @@ tasks.named('jar', Jar).configure {
     finalizedBy 'reobfJar'
 }
 
+// Jar-in-Jar 产物才是真正可分发的：它含 big-math，
+// 因此让它占用无后缀的名字，避免误发缺依赖的薄 jar
+tasks.named('jarJar').configure {
+    archiveClassifier = ''
+}
+
 
 publishing {
     publications {
         register('mavenJava', MavenPublication) {
-            artifact jar
+            artifact tasks.named('jarJar')
         }
     }
     repositories {
