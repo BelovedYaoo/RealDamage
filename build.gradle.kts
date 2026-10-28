@@ -8,6 +8,17 @@ fun prop(name: String, consumer: (prop: String) -> Unit) {
 
 val minecraft = property("deps.minecraft") as String
 
+// forge / neoforge / fabric
+val constraint: String = name.split("-")[1]
+
+// Fabric 变体才有这两个属性；Loom 的加载器版本必须显式声明，Fabric API 版本要跟 MC 对号入座
+val fabricLoaderVersion = findProperty("deps.fabricLoader") as? String ?: ""
+val fabricApiVersion = findProperty("deps.fabricApi") as? String ?: ""
+
+// Fabric 侧没有 Forge/NeoForge 自带的 nightconfig，需要自己在编译期依赖 + jar-in-jar 打包；
+// 版本对齐 1.20.1 Forge 内置的 3.6.4，保证三个加载器用到的 API 子集是同一份
+val nightConfigVersion = "3.6.4"
+
 // 1.21 起运行时最低就是 Java 21；构建 JVM 本身由 Modstitch 要求为 21，两者在 1.21 上重合
 val javaTargetVersion = when (minecraft) {
     "1.19.2" -> 17
@@ -44,7 +55,7 @@ data class LoaderManifest(
 
 // 同一个加载器在不同 MC 版本上的版本范围并不相同（Forge 1.19.2 是 43.x、1.20.1 是 47.x），
 // 所以清单信息要同时按 MC 版本与加载器两个维度取值
-val loaderManifest = when (minecraft to name.split("-")[1]) {
+val loaderManifest = when (minecraft to constraint) {
     "1.19.2" to "forge" -> LoaderManifest(
         modId = "forge",
         versionRange = "[43,)",
@@ -66,7 +77,19 @@ val loaderManifest = when (minecraft to name.split("-")[1]) {
         minecraftVersionRange = "[1.21,1.21.2)",
     )
 
-    else -> throw IllegalArgumentException("请在此登记 ${minecraft} + ${name.split("-")[1]} 对应的加载器清单信息")
+    // Fabric 的清单是 fabric.mod.json，用的是 Fabric 自己的依赖谓词语法：
+    // loader 版本写成 >=x.y.z，MC 版本用 ~（同一次版本）——不能用 Forge 那边的 Maven 区间 [...]
+    "1.19.2" to "fabric",
+    "1.20.1" to "fabric",
+    "1.21.1" to "fabric",
+    -> LoaderManifest(
+        modId = "fabricloader",
+        versionRange = ">=$fabricLoaderVersion",
+        languageVersion = "",
+        minecraftVersionRange = "~$minecraft",
+    )
+
+    else -> throw IllegalArgumentException("请在此登记 ${minecraft} + ${constraint} 对应的加载器清单信息")
 }
 
 modstitch {
@@ -99,6 +122,21 @@ modstitch {
             put("loader_version_range", loaderManifest.versionRange)
             put("loader_language_version", loaderManifest.languageVersion)
             put("minecraft_version_range", loaderManifest.minecraftVersionRange)
+            // Fabric API 是硬前置（/realDamage 命令要用它的 CommandRegistrationCallback）；
+            // 去掉 +1.20.1 这类构建元数据，只留数字版本，Fabric 的版本谓词更好解析
+            put("fabric_api_version_range", ">=${fabricApiVersion.substringBefore('+')}")
+        }
+    }
+
+    // Loom（Fabric）：映射用官方 Mojang 映射 + Parchment，所以 src/ 里的 Mojang 名原样可用
+    loom {
+        prop("deps.fabricLoader") { fabricLoaderVersion = it }
+        configureLoom {
+            // 把 refmap 文件名钉死。realdamage-fabric.mixins.json 里要写死这个文件名，
+            // 而 Loom 默认按 archivesName 推导（realdamage-refmap.json），变体一多就不该靠巧合
+            mixin {
+                defaultRefmapName = "realdamage-refmap.json"
+            }
         }
     }
 
@@ -118,12 +156,17 @@ modstitch {
     // 也必须注册配置，否则 refmap 不会被生成、reobfJar 会失败
     mixin {
         addMixinsToModManifest = true
-        configs.register("realdamage")
+        // Fabric 用独立配置文件：mixin 类只存在于 Fabric 产物里，而 JSON 没法用 Stonecutter
+        // 注释守卫，只能靠“每个加载器注册自己那份”来隔离，否则 Forge 上会把真实伤害结算两遍
+        if (modstitch.isLoom) {
+            configs.register("realdamage-fabric")
+        } else {
+            configs.register("realdamage")
+        }
     }
 }
 
 // Stonecutter 常量：供 //? if <loader> { 注释守卫使用
-val constraint: String = name.split("-")[1]
 stonecutter {
     consts(
         "fabric" to constraint.equals("fabric"),
@@ -133,24 +176,38 @@ stonecutter {
 }
 
 dependencies {
-    // 编译期需要该库；运行时则需要 Jar-in-Jar 把它打进产物，两者缺一不可
+    // 编译期需要该库；运行时则需要 jar-in-jar 把它打进产物，两者缺一不可
     implementation("ch.obermuhlner:big-math:2.3.2")
-    add("jarJar", "ch.obermuhlner:big-math:2.3.2")
+    // Modstitch 的平台无关 jar-in-jar 配置：MDG 侧接到 FML 的 jarJar，Loom 侧接到 include。
+    // 不能直接用 jarJar：那个配置是 MDG 自己建的，Loom 上没有
+    add("modstitchJiJ", "ch.obermuhlner:big-math:2.3.2")
+
+    if (modstitch.isLoom) {
+        // nightconfig 只给 Fabric 打包：Forge/NeoForge 运行时已经自带（3.6.4 / 3.8.3）。
+        // modstitchJiJ 是 transitive=false，所以 core 与 toml 必须分别声明，否则只打进一半
+        implementation("com.electronwill.night-config:toml:$nightConfigVersion")
+        add("modstitchJiJ", "com.electronwill.night-config:core:$nightConfigVersion")
+        add("modstitchJiJ", "com.electronwill.night-config:toml:$nightConfigVersion")
+        // Fabric 的命令注册靠 Fabric API；modImplementation 由 Loom 提供
+        add("modImplementation", "net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
+    }
 }
 
 // Modstitch 本来会按平台排除「别的加载器」的清单，但它拿文件基名（mods.toml）
 // 去比对带目录的清单路径（META-INF/mods.toml），实际匹配不上，于是 legacy 产物里
 // 也混进了 neoforge.mods.toml。这里按路径再排一次，保证每个变体只带自己那份清单。
 val otherLoaderManifests =
-    listOf("META-INF/mods.toml", "META-INF/neoforge.mods.toml") - modstitch.modLoaderManifest
+    listOf("META-INF/mods.toml", "META-INF/neoforge.mods.toml", "fabric.mod.json") - modstitch.modLoaderManifest
 tasks.withType<ProcessResources>().configureEach {
     exclude(otherLoaderManifests)
+    // 两份 mixin 配置一一对应各自的加载器：没注册的那份不该留在产物里
+    exclude(if (modstitch.isLoom) "$modIdConst.mixins.json" else "$modIdConst-fabric.mixins.json")
 }
 
 // src/main/resources 不经过 Modstitch 的占位符渲染（那一套只作用于 templates），
-// 所以 mixins.json 里的 ${java_compatibility} 需要在这里单独展开
+// 所以 mixins.json 里的 ${java_compatibility} 需要在这里单独展开；Fabric 那份同理
 tasks.named<ProcessResources>("processResources") {
-    filesMatching("$modIdConst.mixins.json") {
+    filesMatching(listOf("$modIdConst.mixins.json", "$modIdConst-fabric.mixins.json")) {
         expand(mapOf("java_compatibility" to javaCompatibilityLevel))
     }
 }
