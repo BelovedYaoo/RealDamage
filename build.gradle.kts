@@ -152,8 +152,8 @@ modstitch {
         }
     }
 
-    // Modstitch 的 reobf 会重映射 mixin refmap，因此即使当前没有 mixin
-    // 也必须注册配置，否则 refmap 不会被生成、reobfJar 会失败
+    // Modstitch 的 reobf 会重映射 mixin refmap，所以必须注册配置（即使该加载器的 mixin 列表是空的），
+    // 否则 reobfJar 找不到 refmap 输入
     mixin {
         addMixinsToModManifest = true
         // Fabric 用独立配置文件：mixin 类只存在于 Fabric 产物里，而 JSON 没法用 Stonecutter
@@ -213,8 +213,10 @@ tasks.named<ProcessResources>("processResources") {
 }
 
 // Modstitch 在 legacyforge 平台会无条件注册 <modId>.refmap.json 及其映射文件，
-// 但 mixin 注解处理器在项目尚无 mixin 时不会产出这两个文件，导致 reobfJar 找不到输入。
-// 当前仓库没有 mixin，故在缺失时补出空文件；日后加入 mixin 后由注解处理器正常产出。
+// 但 mixin 注解处理器只有在真的处理到 mixin 类时才产出这两个文件。
+// 目前唯一的 mixin（PlayerActuallyHurtMixin）只在 Fabric 侧编译，Forge/NeoForge 的
+// realdamage.mixins.json 的 mixins 列表是空的，所以 legacy 变体需要补出空 refmap，
+// 否则 reobfJar 会因找不到输入而失败。
 //
 // 这段只对 legacyforge 生效：NeoForge/Fabric 不经过 reobf 重映射，不需要 refmap，
 // 无条件生成只会往 build/mixin 里塞没人引用的死文件。
