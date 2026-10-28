@@ -2,9 +2,17 @@ package top.bemylover.realdamage.handler;
 
 import com.mojang.logging.LogUtils;
 import net.minecraft.world.entity.player.Player;
+//? if forge {
 import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+//?}
+
+//? if neoforge {
+/*import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
+*///?}
 import org.slf4j.Logger;
 import top.bemylover.realdamage.RealDamage;
 import top.bemylover.realdamage.config.RealDamageConfig;
@@ -16,13 +24,23 @@ import top.bemylover.realdamage.util.FunctionCalculationUtil;
  * @author PrefersMin
  * @version 1.0
  */
+//? if forge {
 @Mod.EventBusSubscriber(modid = RealDamage.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+//?}
+//? if neoforge {
+/*@EventBusSubscriber(modid = RealDamage.MODID)
+*///?}
 public class RealDamageCalculationHandler {
 
     private static final Logger LOGGER = LogUtils.getLogger();
 
     @SubscribeEvent
+    //? if forge {
     public static void onLivingHurt(LivingHurtEvent event) {
+    //?}
+    //? if neoforge {
+    /*public static void onLivingHurt(LivingIncomingDamageEvent event) {
+    *///?}
 
         // 判断受伤实体是否为玩家
         if (!(event.getEntity() instanceof Player player)) {
