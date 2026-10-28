@@ -48,7 +48,12 @@ public class RealDamageCalculationHandler {
         }
 
         // 获取当前世界天数
+        // 1.20 起 Entity#level() 取代了 getLevel()，两者只在这一处有差异
+        //? if >=1.20 {
         int dayTime = Math.toIntExact(player.level().getDayTime() / 24000);
+        //?} else {
+        /*int dayTime = Math.toIntExact(player.getLevel().getDayTime() / 24000);
+        *///?}
 
         // 判定是否启用保护期
         if (RealDamageConfig.IS_ENABLE_PROTECTION.get()) {

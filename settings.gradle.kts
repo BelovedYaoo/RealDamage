@@ -27,6 +27,7 @@ stonecutter {
             loaders.forEach { vers("$name-$it", mcVersion) }
 
         // 目标矩阵：Fabric 在后续步骤加入
+        mc("1.19.2", loaders = listOf("forge"))
         mc("1.20.1", loaders = listOf("forge"))
         mc("1.21.1", loaders = listOf("neoforge"))
 

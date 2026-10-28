@@ -10,6 +10,7 @@ val minecraft = property("deps.minecraft") as String
 
 // 1.21 起运行时最低就是 Java 21；构建 JVM 本身由 Modstitch 要求为 21，两者在 1.21 上重合
 val javaTargetVersion = when (minecraft) {
+    "1.19.2" -> 17
     "1.20.1" -> 17
     "1.21.1" -> 21
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的 Java 版本")
@@ -17,6 +18,7 @@ val javaTargetVersion = when (minecraft) {
 
 // 每个 MC 版本对应的资源包/数据包格式号，写错会让客户端提示资源包不兼容
 val resourcePackFormat = when (minecraft) {
+    "1.19.2" -> 9
     "1.20.1" -> 15
     "1.21.1" -> 34
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的资源包格式版本")
@@ -40,22 +42,31 @@ data class LoaderManifest(
     val minecraftVersionRange: String,
 )
 
-val loaderManifest = when (val loader = name.split("-")[1]) {
-    "forge" -> LoaderManifest(
+// 同一个加载器在不同 MC 版本上的版本范围并不相同（Forge 1.19.2 是 43.x、1.20.1 是 47.x），
+// 所以清单信息要同时按 MC 版本与加载器两个维度取值
+val loaderManifest = when (minecraft to name.split("-")[1]) {
+    "1.19.2" to "forge" -> LoaderManifest(
+        modId = "forge",
+        versionRange = "[43,)",
+        languageVersion = "[43,)",
+        minecraftVersionRange = "[1.19.2,1.20)",
+    )
+
+    "1.20.1" to "forge" -> LoaderManifest(
         modId = "forge",
         versionRange = "[47,)",
         languageVersion = "[47,)",
         minecraftVersionRange = "[1.20.1,1.21)",
     )
 
-    "neoforge" -> LoaderManifest(
+    "1.21.1" to "neoforge" -> LoaderManifest(
         modId = "neoforge",
         versionRange = "[21.1,)",
         languageVersion = "[4,)",
         minecraftVersionRange = "[1.21,1.21.2)",
     )
 
-    else -> throw IllegalArgumentException("请在此登记 ${loader} 对应的加载器清单信息")
+    else -> throw IllegalArgumentException("请在此登记 ${minecraft} + ${name.split("-")[1]} 对应的加载器清单信息")
 }
 
 modstitch {
