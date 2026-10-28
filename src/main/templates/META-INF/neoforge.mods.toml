@@ -1,0 +1,29 @@
+# NeoForge 1.20.5 起官方清单文件名固定为 META-INF/neoforge.mods.toml，
+# 旧的 mods.toml 不再被读取。Modstitch 会按当前变体的平台自动排除另一份清单，
+# 因此这里与 mods.toml 并存，不必用 Stonecutter 守卫。
+modLoader = "javafml"
+loaderVersion = "${loader_language_version}"
+license = "${mod_license}"
+
+[[mods]]
+    modId = "${mod_id}"
+    version = "${mod_version}"
+    displayName = "${mod_name}"
+    authors = "${mod_author}"
+    description = '''${mod_description}'''
+    logoFile = "logo.png"
+
+[[dependencies.${mod_id}]]
+    modId = "${loader_mod_id}"
+    # 1.20.5 起 mandatory 字段被 type 取代，旧写法虽然仍兼容但会打印弃用警告
+    type = "required"
+    versionRange = "${loader_version_range}"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.${mod_id}]]
+    modId = "minecraft"
+    type = "required"
+    versionRange = "${minecraft_version_range}"
+    ordering = "NONE"
+    side = "BOTH"

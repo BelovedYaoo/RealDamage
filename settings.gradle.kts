@@ -26,8 +26,9 @@ stonecutter {
         fun mc(mcVersion: String, name: String = mcVersion, loaders: Iterable<String>) =
             loaders.forEach { vers("$name-$it", mcVersion) }
 
-        // 目标矩阵：先只保留 1.20.1-forge，Fabric 与 1.21.1 在后续步骤加入
+        // 目标矩阵：Fabric 在后续步骤加入
         mc("1.20.1", loaders = listOf("forge"))
+        mc("1.21.1", loaders = listOf("neoforge"))
 
         // src/ 以该变体的代码形态提交，其他变体由预处理器生成
         vcsVersion = "1.20.1-forge"

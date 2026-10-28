@@ -2,7 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "top.bemylover.realdamage.mixin",
-  "compatibilityLevel": "JAVA_17",
+  "compatibilityLevel": "${java_compatibility}",
   "mixins": [],
   "client": [],
   "server": [],
