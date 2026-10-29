@@ -13,6 +13,9 @@
   "entrypoints": {
     "main": [
       "top.bemylover.realdamage.RealDamage"
+    ],
+    "fabric-gametest": [
+      "top.bemylover.realdamage.gametest.FabricRealDamageGameTests"
     ]
   },
   "depends": {

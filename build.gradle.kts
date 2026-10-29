@@ -149,6 +149,13 @@ modstitch {
         defaultRuns()
         configureNeoforge {
             runs.all { disableIdeRun() }
+            // GameTest 数值验证的入口。defaultRuns() 只给 client / server，而 gameTestServer
+            // 是 userdev 配置里另有一份的 run 类型：MDG 会从它拿到主类、--launchTarget 以及
+            // forge.gameTestServer / neoforge.gameTestServer 这类系统属性。类型名不能自定义，
+            // 必须与 userdev 里的键同名，否则 MDG 在准备运行时找不到该 run 类型会直接报错
+            runs.register("gameTestServer") {
+                type.set("gameTestServer")
+            }
         }
     }
 
@@ -209,6 +216,96 @@ tasks.withType<ProcessResources>().configureEach {
 tasks.named<ProcessResources>("processResources") {
     filesMatching(listOf("$modIdConst.mixins.json", "$modIdConst-fabric.mixins.json")) {
         expand(mapOf("java_compatibility" to javaCompatibilityLevel))
+    }
+}
+
+// GameTest 只在开发期由 gameTestServer 运行，代码本身却被 Stonecutter 生成进了 main 源集
+// （GameTest 类要引用三个加载器各自的注解，又没法塞进独立源集而不失去 Stonecutter 的预处理）。
+tasks.withType<Jar>().configureEach {
+    // 空结构体是 GameTest 专用数据：1.20.1 读 data/<ns>/structures/，1.21.1 读 data/<ns>/structure/，
+    // 运行时靠 MOD_CLASSES 指向 build/resources，排掉 jar 不影响 gametest 本身
+    exclude("data/realdamage/structures/**", "data/realdamage/structure/**")
+    // Forge / NeoForge 的测试类靠扫描 @GameTestHolder 注解发现，没有任何代码引用它们，可以放心排掉。
+    // Fabric 排不掉：fabric-gametest-api-v1 要求测试类以 fabric.mod.json 的 fabric-gametest
+    // 入口点登记（TestFunctionsMixin 会按声明类反查 mod id，没登记就直接抛异常），
+    // 而入口点里的类必须真实存在，否则正式环境一启动就会找不到类。
+    if (!modstitch.isLoom) {
+        exclude("top/bemylover/realdamage/gametest/**")
+    }
+}
+
+// 开发期跑起来时补回 big-math（仅 MDG 平台）。
+//
+// 为什么需要这一步：big-math 同时出现在 implementation 与 modstitchJiJ 里（正式产物靠 jar-in-jar
+// 带上它），而 MDG 会把 jarJar 里的坐标从 run classpath 里扣掉——那个设计的前提是「运行时装的是
+// jar，jar-in-jar 会展开」。开发期装的是 MOD_CLASSES 指向的源集目录，没有 jar-in-jar 元数据，
+// 于是 mod 构造期就 NoClassDefFoundError: ch/obermuhlner/math/big/BigDecimalMath。
+// 光往 JVM classpath 上加也不够：Forge/NeoForge 的开发启动走 ModLauncher 的模块系统，依赖必须落到
+// <run>AdditionalRuntimeClasspath（它会汇入 legacy classpath 文件）里才对游戏可见。
+// Loom 侧不需要：include 不会把 implementation 的依赖从 run classpath 里挖掉。
+if (!modstitch.isLoom) {
+    val devRunJarJarDependencies = listOf("ch.obermuhlner:big-math:2.3.2")
+            .map { dependencies.create(it) }
+    configurations.matching { it.name.endsWith("AdditionalRuntimeClasspath") }.configureEach {
+        devRunJarJarDependencies.forEach { dependency -> dependencies.add(dependency) }
+    }
+}
+
+// 开发期可选的两个开关，都靠 Gradle 属性显式打开，避免日常运行时多出参数与日志：
+// -Prealdamage.mixinVerbose：Mixin 默认只在 DEBUG 级别记录「Mixing ... into ...」，
+//   客户端验证要取证就必须显式打开
+// -Prealdamage.fabricGametest：Fabric 侧没有独立的 gametest run 配置，
+//   fabric-gametest-api-v1 是靠这个系统属性把自己的 headless GameTestServer 接管 runServer 的
+val devRunJvmArgs = buildList {
+    if (providers.gradleProperty("realdamage.mixinVerbose").isPresent) {
+        add("-Dmixin.debug.verbose=true")
+    }
+    if (providers.gradleProperty("realdamage.fabricGametest").isPresent && modstitch.isLoom) {
+        add("-Dfabric-api.gametest=1")
+        add("-Dfabric-api.gametest.report-file=${layout.buildDirectory.get().asFile.resolve("gametest-report.xml")}")
+    }
+}
+if (devRunJvmArgs.isNotEmpty()) {
+    tasks.matching { it.name == "runClient" || it.name == "runServer" }.configureEach {
+        // Loom 的 runClient/runServer 与 MDG 的 RunGameTask 都是 JavaExec
+        (this as JavaExec).jvmArgs(devRunJvmArgs)
+    }
+}
+
+// GameTest 必须在关掉网络压缩的服务端下跑。
+//
+// 为什么：GameTestHelper#makeMockServerPlayerInLevel 造出来的假玩家挂的是一条没有 channel 的
+// Connection，而 PlayerList#placeNewPlayer 会按 server.properties 里的 network-compression-threshold
+// 调 Connection#setupCompression，channel 为 null 时直接 NPE（原版自己的 gametest 也是关着压缩跑的）。
+// 这里在启动前把该属性钉死，而不是指望 run 目录里恰好有一份改过的 server.properties。
+// 这里手写文本而不引 java.util.Properties：Kotlin DSL 里 `java` 被 JavaPluginExtension 遮住了
+fun forceGametestServerProperties(gameDir: File) {
+    val key = "network-compression-threshold"
+    val required = "$key=-1"
+    val file = gameDir.resolve("server.properties")
+    val lines = (if (file.isFile) file.readText() else "").lines().toMutableList()
+    val index = lines.indexOfFirst { it.trimStart().startsWith("$key=") }
+    if (index >= 0) {
+        lines[index] = required
+    } else {
+        if (lines.isNotEmpty() && lines.last().isEmpty()) lines.removeAt(lines.lastIndex)
+        lines.add(required)
+        lines.add("")
+    }
+    file.parentFile.mkdirs()
+    file.writeText(lines.joinToString("\n"))
+}
+
+// MDG 的 gameTestServer 与 Fabric（靠 -Prealdamage.fabricGametest 把 runServer 变成 gametest 服务端）
+// 都要走一次这个预处理；gameDir 两边都是 <变体目录>/run
+tasks.matching {
+    it.name == "runGameTestServer" || (it.name == "runServer" && modstitch.isLoom)
+}.configureEach {
+    doFirst {
+        // Loom 的 runServer 平时也会跑，只有真的跑 gametest 时才该改配置
+        if (name == "runGameTestServer" || providers.gradleProperty("realdamage.fabricGametest").isPresent) {
+            forceGametestServerProperties(layout.projectDirectory.dir("run").asFile)
+        }
     }
 }
 
