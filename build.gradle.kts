@@ -230,7 +230,7 @@ tasks.named<ProcessResources>("processResources") {
 tasks.withType<Jar>().configureEach {
     // 空结构体是 GameTest 专用数据：1.20.1 读 data/<ns>/structures/，1.21.1 读 data/<ns>/structure/，
     // 运行时靠 MOD_CLASSES 指向 build/resources，排掉 jar 不影响 gametest 本身
-    exclude("data/realdamage/structures/**", "data/realdamage/structure/**")
+    exclude("data/realdamage/**")
     // Forge / NeoForge 的测试类靠扫描 @GameTestHolder 注解发现，没有任何代码引用它们，可以放心排掉。
     // Fabric 排不掉：fabric-gametest-api-v1 要求测试类以 fabric.mod.json 的 fabric-gametest
     // 入口点登记（TestFunctionsMixin 会按声明类反查 mod id，没登记就直接抛异常），
