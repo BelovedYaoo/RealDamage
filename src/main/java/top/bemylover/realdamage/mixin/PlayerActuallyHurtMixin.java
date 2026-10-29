@@ -9,6 +9,10 @@ import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import top.bemylover.realdamage.handler.RealDamageCalculator;
 *///?}
 
+//? if fabric && >=1.21.2 {
+/*import net.minecraft.server.level.ServerLevel;
+*///?}
+
 /**
  * Fabric 侧的伤害钩子。
  *
@@ -38,12 +42,30 @@ import top.bemylover.realdamage.handler.RealDamageCalculator;
  * <h2>为什么只注入 Player</h2>
  * 原版 Player 覆写了 LivingEntity#actuallyHurt（为了统计与饱食度消耗），玩家的伤害结算
  * 实际走的是 Player 这一份；本模组本来就只处理玩家（旧版事件处理器对非玩家直接返回）。
- * 1.19.2 / 1.20.1 / 1.21.1 的 ServerPlayer 都没有再覆写该方法，所以不需要额外目标。
+ * 1.19.2 / 1.20.1 / 1.21.1 / 1.21.11 的 ServerPlayer 都没有再覆写该方法，所以不需要额外目标。
  *
- * <p>index = 2 是绝对局部变量槽位（实例方法里 0 是 this、1 是 DamageSource、2 是 float），
- * 配合 argsOnly = true 只在该方法的参数里找，避免误捕同名局部变量。</p>
+ * <h2>为什么整个类按 1.21.2 分成两份</h2>
+ * 1.21.2 给 actuallyHurt 追加了一个 ServerLevel 参数
+ * （Player#actuallyHurt(ServerLevel, DamageSource, float)，用 1.21.11 的官方映射核实过），
+ * 于是两者的注入点槽位与 handler 签名都变了：旧版是 (this, source, amount) ⇒ index = 2，
+ * 新版是 (this, level, source, amount) ⇒ index = 3。参数槽位与签名无法只靠包一层方法体抹平，
+ * 所以按版本各写一份。index 是绝对局部变量槽位（0 是 this），配合 argsOnly = true
+ * 只在该方法的参数里找，避免误捕同名局部变量。
+ *
+ * <p>handler 的参数顺序必须与目标方法一致：先是被改的变量，再按目标方法的参数顺序排列。
+ * 新版因此把 ServerLevel 也带上——即使本模组用不到它。</p>
  */
-//? if fabric {
+//? if fabric && >=1.21.2 {
+/*@Mixin(Player.class)
+public abstract class PlayerActuallyHurtMixin {
+
+    @ModifyVariable(method = "actuallyHurt", at = @At("HEAD"), argsOnly = true, index = 3)
+    private float realdamage$splitRealDamage(float amount, ServerLevel level, DamageSource source) {
+        return RealDamageCalculator.splitAndApplyRealDamage((Player) (Object) this, source, amount);
+    }
+}
+*///?}
+//? if fabric && <1.21.2 {
 /*@Mixin(Player.class)
 public abstract class PlayerActuallyHurtMixin {
 

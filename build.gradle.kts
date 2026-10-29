@@ -1,5 +1,11 @@
 plugins {
     id("dev.isxander.modstitch.base") version "0.5.12"
+    // Modstitch 0.5.12 传递进来的 Loom 是 1.10.x，而 Fabric API 0.138+（包括 1.21.11 那一支）
+    // 是用 Loom 1.13.3 构建的，旧 Loom 会在配置阶段直接拒绝加载：
+    // "Mod was built with a newer version of Loom"。插件 classpath 上同名插件按版本冲突
+    // 取高版本，所以在这里显式声明一份新 Loom、apply false（只上 classpath，不自作主张应用）
+    // 就能抬高 Modstitch 实际用到的那个版本，同时不动其它变体的平台选择。
+    id("fabric-loom") version "1.13.3" apply false
 }
 
 fun prop(name: String, consumer: (prop: String) -> Unit) {
@@ -24,15 +30,38 @@ val javaTargetVersion = when (minecraft) {
     "1.19.2" -> 17
     "1.20.1" -> 17
     "1.21.1" -> 21
+    "1.21.11" -> 21
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的 Java 版本")
 }
 
-// 每个 MC 版本对应的资源包/数据包格式号，写错会让客户端提示资源包不兼容
+// 每个 MC 版本对应的资源包/数据包格式号，写错会让客户端提示资源包不兼容。
+// 1.21.9（快照 25w31a）起 pack.mcmeta 的格式声明从单一 pack_format 换成 min_format/max_format，
+// 而且资源包与数据包各自独立编号（1.21.11 是资源包 75.0 / 数据包 94.1）。
+// 模组 jar 里这份 pack.mcmeta 同时被当作资源包与数据包声明读取，所以新版本要写成覆盖两者的区间，
+// 具体字段文本由 packFormatFields 生成，模板里只留一个占位符。
 val resourcePackFormat = when (minecraft) {
     "1.19.2" -> 9
     "1.20.1" -> 15
     "1.21.1" -> 34
+    "1.21.11" -> 75
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的资源包格式版本")
+}
+
+// 数据包格式号；1.21.9 之前与资源包同号，模板里也就只写一个字段
+val dataPackFormat = when (minecraft) {
+    "1.19.2" -> 9
+    "1.20.1" -> 15
+    "1.21.1" -> 34
+    "1.21.11" -> 94
+    else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的数据包格式版本")
+}
+
+val packFormatFields = if (resourcePackFormat == dataPackFormat && minecraft != "1.21.11") {
+    // 1.21.9 之前的写法：单一字段
+    "\"pack_format\": $resourcePackFormat"
+} else {
+    // 1.21.9 起：min/max 要同时容得下资源包与数据包两种格式号
+    "\"min_format\": ${minOf(resourcePackFormat, dataPackFormat)}, \"max_format\": ${maxOf(resourcePackFormat, dataPackFormat)}"
 }
 
 // mixins.json 的 compatibilityLevel 必须不低于 mixin 类自身的字节码版本，
@@ -77,11 +106,19 @@ val loaderManifest = when (minecraft to constraint) {
         minecraftVersionRange = "[1.21,1.21.2)",
     )
 
+    "1.21.11" to "neoforge" -> LoaderManifest(
+        modId = "neoforge",
+        versionRange = "[21.11,)",
+        languageVersion = "[4,)",
+        minecraftVersionRange = "[1.21.11,1.22)",
+    )
+
     // Fabric 的清单是 fabric.mod.json，用的是 Fabric 自己的依赖谓词语法：
     // loader 版本写成 >=x.y.z，MC 版本用 ~（同一次版本）——不能用 Forge 那边的 Maven 区间 [...]
     "1.19.2" to "fabric",
     "1.20.1" to "fabric",
     "1.21.1" to "fabric",
+    "1.21.11" to "fabric",
     -> LoaderManifest(
         modId = "fabricloader",
         versionRange = ">=$fabricLoaderVersion",
@@ -117,6 +154,7 @@ modstitch {
             put("mod_license", "0BSD")
             put("mod_description", "Do you like this?")
             put("pack_format", resourcePackFormat.toString())
+            put("pack_format_fields", packFormatFields)
             put("java_compatibility", javaCompatibilityLevel)
             put("loader_mod_id", loaderManifest.modId)
             put("loader_version_range", loaderManifest.versionRange)
@@ -249,11 +287,20 @@ tasks.withType<Jar>().configureEach {
 // 光往 JVM classpath 上加也不够：Forge/NeoForge 的开发启动走 ModLauncher 的模块系统，依赖必须落到
 // <run>AdditionalRuntimeClasspath（它会汇入 legacy classpath 文件）里才对游戏可见。
 // Loom 侧不需要：include 不会把 implementation 的依赖从 run classpath 里挖掉。
+//
+// 1.21.11 的 NeoForge 声明了 noLegacyClasspath 特性，MDG 从那一代起不再生成
+// <run>AdditionalRuntimeClasspath（往上面加依赖会直接报错），开发运行的 classpath 就是普通配置，
+// 所以这一档改走 runtimeOnly：效果同样是「运行时能看见，而产物靠 jar-in-jar 带」。
+val usesLegacyRunClasspath = minecraft != "1.21.11"
 if (!modstitch.isLoom) {
     val devRunJarJarDependencies = listOf("ch.obermuhlner:big-math:2.3.2")
             .map { dependencies.create(it) }
-    configurations.matching { it.name.endsWith("AdditionalRuntimeClasspath") }.configureEach {
-        devRunJarJarDependencies.forEach { dependency -> dependencies.add(dependency) }
+    if (usesLegacyRunClasspath) {
+        configurations.matching { it.name.endsWith("AdditionalRuntimeClasspath") }.configureEach {
+            devRunJarJarDependencies.forEach { dependency -> dependencies.add(dependency) }
+        }
+    } else {
+        devRunJarJarDependencies.forEach { dependencies.add("runtimeOnly", it) }
     }
 }
 

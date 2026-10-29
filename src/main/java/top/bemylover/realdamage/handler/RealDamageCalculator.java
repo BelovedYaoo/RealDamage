@@ -1,6 +1,9 @@
 package top.bemylover.realdamage.handler;
 
 import com.mojang.logging.LogUtils;
+//? if >=1.21.2 {
+/*import net.minecraft.server.level.ServerLevel;
+*///?}
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Player;
 import org.slf4j.Logger;
@@ -40,9 +43,20 @@ public final class RealDamageCalculator {
         // 触发的，本就不会对无敌实体走到这里；Fabric 侧的 mixin 注入在方法开头，早于该检查。
         // 在这里统一补一次判定，否则创造/旁观模式玩家、以及火焰抗性这类伤害类型免疫的情况
         // 会在 Fabric 上被扣真实伤害，与另外两个加载器不一致。
+        //
+        // 1.21.2 起这个判定要多传一个 ServerLevel（Entity#isInvulnerableTo(ServerLevel, DamageSource)），
+        // 它是给依赖世界的伤害类型规则用的。伤害结算只会发生在服务端，玩家所在维度就是那个
+        // ServerLevel（GameTest 的假玩家同样挂在 ServerLevel 上）；万一拿不到（理论上不会），
+        // 就按「免疫」处理：宁可这一击不扣真实伤害，也不要绕过无敌判定。
+        //? if >=1.21.2 {
+        /*if (!(player.level() instanceof ServerLevel serverLevel) || player.isInvulnerableTo(serverLevel, source)) {
+            return originalDamage;
+        }
+        *///?} else {
         if (player.isInvulnerableTo(source)) {
             return originalDamage;
         }
+        //?}
 
         // 每次结算都用同一份配置快照，避免算到一半配置被重载导致数值前后不一致
         RealDamageSettings settings = RealDamageConfig.settings();

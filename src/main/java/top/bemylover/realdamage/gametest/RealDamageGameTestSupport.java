@@ -3,6 +3,9 @@ package top.bemylover.realdamage.gametest;
 import com.mojang.logging.LogUtils;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
+//? if >=1.21.5 {
+/*import net.minecraft.network.chat.Component;
+*///?}
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -170,7 +173,12 @@ public final class RealDamageGameTestSupport {
         setDay(helper.getLevel(), 5);
         player.setInvulnerable(true);
         DamageSource source = attackDamage(helper.getLevel(), player);
+        // 1.21.2 起这个判定要带上 ServerLevel（Entity#isInvulnerableTo 的签名变了）
+        //? if >=1.21.2 {
+        /*check(player.isInvulnerableTo(helper.getLevel(), source), "前置条件：无敌玩家应当对 player_attack 免疫");
+        *///?} else {
         check(player.isInvulnerableTo(source), "前置条件：无敌玩家应当对 player_attack 免疫");
+        //?}
         float healthBefore = player.getHealth();
 
         float drop = hurtAndMeasureHealthDrop(player, source);
@@ -328,10 +336,17 @@ public final class RealDamageGameTestSupport {
      * <p>不用 {@link GameTestHelper#assertTrue}：1.19.2 的 GameTestHelper 还没有这个方法，
      * 而这个类由 Stonecutter 生成进所有变体的 main 源集，必须能在每个版本上编译通过。
      * {@link GameTestAssertException} 三个加载器的框架都会当成「测试失败」处理。</p>
+     *
+     * <p>1.21.5 起这个异常的构造器变成了 (Component, int tick)：消息改成了组件，
+     * 还多了一个「失败时所处的 tick」；旧版的单 String 构造器被删了，所以按版本分开写。</p>
      */
     private static void check(boolean condition, String message) {
         if (!condition) {
+            //? if >=1.21.5 {
+            /*throw new GameTestAssertException(Component.literal(message), 0);
+            *///?} else {
             throw new GameTestAssertException(message);
+            //?}
         }
     }
 }
