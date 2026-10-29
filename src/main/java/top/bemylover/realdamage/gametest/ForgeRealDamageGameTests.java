@@ -1,11 +1,11 @@
 package top.bemylover.realdamage.gametest;
 
 //? if forge {
-/*import net.minecraft.gametest.framework.GameTest;
+import net.minecraft.gametest.framework.GameTest;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraftforge.gametest.GameTestHolder;
 import net.minecraftforge.gametest.PrefixGameTestTemplate;
-*///?}
+//?}
 
 /**
  * Forge 侧的 GameTest 套件。
@@ -19,7 +19,7 @@ import net.minecraftforge.gametest.PrefixGameTestTemplate;
  * 只是需要一个可放置的空测试场地。</p>
  */
 //? if forge {
-/*@GameTestHolder("realdamage")
+@GameTestHolder("realdamage")
 // 关掉「用类名给结构体名加前缀」：默认为 true 时结构体名会变成
 // realdamage:forgerealdamagegametests.empty，与资源文件对不上
 @PrefixGameTestTemplate(false)
@@ -50,4 +50,4 @@ public class ForgeRealDamageGameTests {
         RealDamageGameTestSupport.afterProtectionRealDamageApplies(helper);
     }
 }
-*///?}
+//?}
