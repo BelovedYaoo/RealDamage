@@ -408,6 +408,11 @@ val devRunJvmArgs = buildList {
     if (providers.gradleProperty("realdamage.mixinVerbose").isPresent) {
         add("-Dmixin.debug.verbose=true")
     }
+    // 验证 mixin 注入点时，光有 verbose 日志不够：要拿到「注入后的类」做字节码级确认，
+    // 必须让 Mixin 把改写后的类导出到 run/.mixin.out/class/ 下
+    if (providers.gradleProperty("realdamage.mixinExport").isPresent) {
+        add("-Dmixin.debug.export=true")
+    }
     if (providers.gradleProperty("realdamage.fabricGametest").isPresent && modstitch.isLoom) {
         add("-Dfabric-api.gametest=1")
         add("-Dfabric-api.gametest.report-file=${layout.buildDirectory.get().asFile.resolve("gametest-report.xml")}")
