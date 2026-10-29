@@ -175,11 +175,10 @@ modstitch {
     loom {
         prop("deps.fabricLoader") { fabricLoaderVersion = it }
         configureLoom {
-            // 把 refmap 文件名钉死。realdamage-fabric.mixins.json 里要写死这个文件名，
-            // 而 Loom 默认按 archivesName 推导（realdamage-refmap.json），变体一多就不该靠巧合
-            mixin {
-                defaultRefmapName = "realdamage-refmap.json"
-            }
+            // 这里刻意不配置 loom.mixin：Loom 1.13 起默认不再跑 Mixin 注解处理器，
+            // 而是直接在 remapJar 阶段把 @ModifyVariable(method = "...") 这类注解值改写成
+            // intermediary 名 + 描述符（产物里实际是 method_6074(Lnet/minecraft/class_3218;...)），
+            // 因此既不需要 refmap，也不该再声明它（否则运行时会警告 refmap 读不到）。
         }
     }
 

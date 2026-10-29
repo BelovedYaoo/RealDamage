@@ -3,7 +3,6 @@
   "minVersion": "0.8",
   "package": "top.bemylover.realdamage.mixin",
   "compatibilityLevel": "${java_compatibility}",
-  "refmap": "realdamage-refmap.json",
   "mixins": [
     "PlayerActuallyHurtMixin"
   ],
