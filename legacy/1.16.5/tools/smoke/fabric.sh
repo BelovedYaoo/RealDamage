@@ -27,6 +27,7 @@ require_files "$MOD_JAR"
 
 mkdir -p "$SMOKE_ROOT" "$SERVER_DIR"
 cd "$SERVER_DIR" || die "进不去 $SERVER_DIR"
+acquire_lock "$SERVER_DIR"
 
 # 1. Fabric 官方 server launcher（内嵌 loader，启动时自己拉 vanilla server jar）
 if [ ! -f "$LAUNCHER" ]; then
@@ -36,11 +37,19 @@ if [ ! -f "$LAUNCHER" ]; then
         || die "launcher 下载失败"
 fi
 if [ ! -f "$API_JAR" ]; then
-    info "下载 Fabric API"
+    # 注意：maven.fabricmc.net 上同名的 fabric-api 构件只是个 2KB 的「聚合模块」，
+    # 里面只有 fabric.mod.json，真正的模块都在它的 POM 依赖里——放进 mods/ 后
+    # Fabric Loader 不会去网上拉依赖，于是运行时会
+    # ClassNotFoundException: net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback。
+    # 玩家实际安装的是官方发布的 bundle（各模块以 jar-in-jar 内嵌），这里取的就是那一份。
+    info "下载 Fabric API（官方 bundle）"
+    API_URL_VERSION="${FABRIC_API_VERSION/+/%2B}"
     curl -sL --max-time 300 -o "$API_JAR" \
-        "https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/${FABRIC_API_VERSION}/fabric-api-${FABRIC_API_VERSION}.jar" \
+        "https://cdn.modrinth.com/data/P7dR8mSH/versions/${API_URL_VERSION}/fabric-api-${FABRIC_API_VERSION}.jar" \
         || die "Fabric API 下载失败"
 fi
+# 防呆：聚合模块只有 2KB，真 bundle 里嵌了四十多个模块
+[ "$(stat -c %s "$API_JAR")" -gt 100000 ] || die "Fabric API 不是官方 bundle（只拿到聚合模块？）：$API_JAR"
 
 # 2. 装 mod 与最小必要配置
 rm -rf mods && mkdir -p mods
@@ -62,7 +71,7 @@ info "启动 Fabric 服务端"
 rm -f "$LOG"
 nohup "$JAVA8" -Xmx2G "${PROXY_JVM[@]}" -jar "$LAUNCHER" nogui >"$LOG" 2>&1 &
 if ! wait_for_done "$LOG" 480; then
-    grep_gbk "$LOG" "ERROR|Exception|Caused by" | head -20
+    grep_log "$LOG" "ERROR|Exception|Caused by" | head -20
     stop_server_by_port "$PORT"
     die "服务端 480 秒内没有出现 Done ("
 fi
@@ -71,11 +80,12 @@ sleep 5
 
 # 4. 取证
 FAILED=0
-grep_gbk "$LOG" "Done \(" | head -1 || true
+grep_log "$LOG" "Done \(" | head -1 || true
 echo "---- 第三方库来源 ----"
-grep_gbk "$LOG" "RealDamage 运行时依赖" || { echo "[FAIL] 没有第三方库自检日志"; FAILED=1; }
-for lib in "big-math-2.3.2.jar" "core-3.6.3.jar" "toml-3.6.3.jar"; do
-    if grep_gbk "$LOG" "运行时依赖" | grep -q "$lib"; then
+grep_log "$LOG" "RealDamage 运行时依赖" || { echo "[FAIL] 没有第三方库自检日志"; FAILED=1; }
+# Fabric 会把 jar-in-jar 的嵌套 jar 解到 .fabric/processedMods/ 下，文件名带内容哈希
+for lib in "big-math-2.3.2" "night-config_core-3.6.3" "night-config_toml-3.6.3"; do
+    if grep_log "$LOG" "运行时依赖" | grep -q "$lib"; then
         echo "[ok] $lib 已加载"
     else
         echo "[FAIL] $lib 未加载"
@@ -83,7 +93,7 @@ for lib in "big-math-2.3.2.jar" "core-3.6.3.jar" "toml-3.6.3.jar"; do
     fi
 done
 echo "---- 崩溃类错误检查 ----"
-if grep_gbk "$LOG" "NoClassDefFoundError|ClassNotFoundException|Loading errors|Failed to load mods|MixinApplyError|InvalidInjectionException"; then
+if grep_log "$LOG" "NoClassDefFoundError|ClassNotFoundException|Loading errors|Failed to load mods|MixinApplyError|InvalidInjectionException"; then
     echo "[FAIL] 出现类加载 / Mixin / 模组加载错误（见上）"
     FAILED=1
 else

@@ -66,8 +66,43 @@ stop_server_by_port() {
     die "端口 $port 仍被占用，不能继续（否则下一个服务端会 BindException）"
 }
 
-# 从 GBK 的 stdout 日志里按 UTF-8 关键词取证（中文必须走这条路）
-grep_gbk() {
+# 把服务端 stdout 日志转成 UTF-8 文本。
+#
+# 两个加载器把中文写进 stdout 的编码并不一致：Forge 侧实测是 GBK（Windows 平台编码），
+# Fabric 侧实测是 UTF-8。固定用 iconv -f GBK 会把后者转成乱码，于是中文关键词永远匹配不到
+# （这个仓库历史上就因为这一类编码错配连续出现过三次假阴性）。所以先探测：整份文件能按
+# UTF-8 解码就直接用，否则再按 GBK 转一次。
+log_text() {
+    local log="$1"
+    if iconv -f UTF-8 -t UTF-8 "$log" >/dev/null 2>&1; then
+        cat "$log"
+    else
+        iconv -f GBK -t UTF-8 "$log" 2>/dev/null
+    fi
+}
+
+# 从服务端日志里按关键词取证
+grep_log() {
     local log="$1" pattern="$2"
-    iconv -f GBK -t UTF-8 "$log" 2>/dev/null | grep -E "$pattern"
+    log_text "$log" | grep -E "$pattern"
+}
+
+# 同一个工作目录不允许并发跑两份冒烟：两个进程会抢同一个日志与同一个端口，
+# 先结束的那份会把后一份的服务端当自己的僵尸进程 kill 掉（实测踩过）
+SMOKE_LOCK=""   # 必须在全局作用域，trap 在函数返回之后才执行
+
+acquire_lock() {
+    local dir="$1" lock="$1/.smoke.lock"
+    SMOKE_LOCK="$lock"
+    if [ -f "$lock" ]; then
+        local pid
+        pid="$(cat "$lock" 2>/dev/null)"
+        if [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null; then
+            die "另一个冒烟进程（PID $pid）正在使用 $dir，请等它结束"
+        fi
+        info "清理残留锁（PID $pid 已不在）"
+        rm -f "$lock"
+    fi
+    echo $$ >"$lock"
+    trap 'rm -f "$SMOKE_LOCK"' EXIT
 }

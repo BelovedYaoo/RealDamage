@@ -24,6 +24,7 @@ require_files "$MOD_JAR"
 
 mkdir -p "$SMOKE_ROOT" "$SERVER_DIR"
 cd "$SERVER_DIR" || die "进不去 $SERVER_DIR"
+acquire_lock "$SERVER_DIR"
 
 # 1. 官方安装器（--installServer 只铺 libraries/ 与启动用 jar，不需要 GUI）
 if [ ! -f "forge-${FORGE_VERSION}.jar" ]; then
@@ -59,7 +60,7 @@ rm -f "$LOG"
 nohup "$JAVA8" -Xmx2G -jar "forge-${FORGE_VERSION}.jar" nogui >"$LOG" 2>&1 &
 START_PID=$!
 if ! wait_for_done "$LOG" 420; then
-    grep_gbk "$LOG" "ERROR|Exception|Caused by" | head -20
+    grep_log "$LOG" "ERROR|Exception|Caused by" | head -20
     stop_server_by_port "$PORT"
     die "服务端 420 秒内没有出现 Done ("
 fi
@@ -68,10 +69,10 @@ sleep 5
 
 # 4. 取证
 FAILED=0
-grep_gbk "$LOG" "Done \(" | head -1 || true
+grep_log "$LOG" "Done \(" | head -1 || true
 echo "---- 第三方库来源 ----"
-grep_gbk "$LOG" "RealDamage 运行时依赖" || { echo "[FAIL] 没有第三方库自检日志"; FAILED=1; }
-DEP_LINE="$(grep_gbk "$LOG" "RealDamage 运行时依赖" | head -1)"
+grep_log "$LOG" "RealDamage 运行时依赖" || { echo "[FAIL] 没有第三方库自检日志"; FAILED=1; }
+DEP_LINE="$(grep_log "$LOG" "RealDamage 运行时依赖" | head -1)"
 # Forge 1.16.5 没有 jar-in-jar 协议，big-math 是摊进产物 jar 里的，所以它的 CodeSource
 # 应当就是我们自己那个 jar；nightconfig 则应当来自 Forge 自带的 libraries/
 # ModLauncher 的 securejarhandler 用 modjar://<modid> 表示「类来自该 mod 自己的 jar」
@@ -88,14 +89,14 @@ else
     FAILED=1
 fi
 echo "---- 崩溃类错误检查 ----"
-if grep_gbk "$LOG" "NoClassDefFoundError|ClassNotFoundException|Loading errors|Failed to load mods"; then
+if grep_log "$LOG" "NoClassDefFoundError|ClassNotFoundException|Loading errors|Failed to load mods"; then
     echo "[FAIL] 出现类加载/模组加载错误（见上）"
     FAILED=1
 else
     echo "[ok] 无 NoClassDefFoundError / ClassNotFoundException / Loading errors"
 fi
 echo "---- 命令注册 ----"
-if grep_gbk "$LOG" "Ambiguity between arguments \[realDamage" ; then
+if grep_log "$LOG" "Ambiguity between arguments \[realDamage" ; then
     echo "[warn] realDamage 命令与其它命令存在歧义"
 else
     echo "[ok] /realDamage 命令已注册（无歧义告警）"

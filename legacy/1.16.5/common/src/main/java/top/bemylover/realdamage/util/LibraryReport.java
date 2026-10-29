@@ -2,6 +2,7 @@ package top.bemylover.realdamage.util;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
 import com.electronwill.nightconfig.core.Config;
+import com.electronwill.nightconfig.toml.TomlFormat;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -29,8 +30,10 @@ public final class LibraryReport {
      * 打印两个第三方库的加载位置。只在启动时调用一次。
      */
     public static void log() {
-        LOGGER.info("RealDamage 运行时依赖：big-math <- {}；nightconfig <- {}",
-                originOf(BigDecimalMath.class), originOf(Config.class));
+        // 三个入口类分别探：Fabric 侧它们来自三个不同的嵌套 jar，
+        // 少打包一个 jar 就是运行时 NoClassDefFoundError，必须逐个可见
+        LOGGER.info("RealDamage 运行时依赖：big-math <- {}；nightconfig-core <- {}；nightconfig-toml <- {}",
+                originOf(BigDecimalMath.class), originOf(Config.class), originOf(TomlFormat.class));
     }
 
     /**
