@@ -236,6 +236,59 @@ modstitch {
     }
 }
 
+// 26.x 起 Mojang 发布的 MC 不再混淆（26.2 的 version.json 里已经没有 client_mappings /
+// server_mappings，jar 里的类名就是 net.minecraft.* 的真名），Loom 从 1.16 起为这种版本
+// 准备了一条独立插件 id（net.fabricmc.fabric-loom，即 LoomNoRemapGradlePlugin），它的作用
+// 只是在构造 LoomGradleExtension 时把内部的 disableObfuscation 标志置为 true。
+// 该标志一旦为真，Loom 的 CompileConfiguration 就整体跳过 mappings 解析（反编译
+// CompileConfiguration#setupMinecraft 第 67 行起的 disableObfuscation 分支核实）。
+//
+// 问题在于 Modstitch 0.5.x 只会应用老的那个 fabric-loom（remap）插件，并且无条件把
+// officialMojangMappings() 塞进 mappings 配置；对 26.x 来说这条映射根本不存在（版本清单里
+// 没有 client_mappings），Loom 会直接失败：Failed to find official mojang mappings for 26.2。
+// 而 net.fabricmc.fabric-loom 必须早于 fabric-loom 应用，Modstitch 已经抢先应用了后者，
+// 因此这里按 Loom 自己的判定依据把同一个标志补上——效果与「用 net.fabricmc.fabric-loom 插件」
+// 完全一致，只是绕开了插件应用顺序的限制。标志本身没有公开 setter，只能取内部属性。
+if (modstitch.isLoom && minecraft.startsWith("26.")) {
+    val loomExtension = extensions.getByName("loom")
+    // Gradle 会给扩展生成一个 *_Decorated 子类，字段实际声明在父类上，这里沿继承链找
+    var extensionClass: Class<*>? = loomExtension.javaClass
+    var field: java.lang.reflect.Field? = null
+    while (extensionClass != null && field == null) {
+        field = extensionClass.declaredFields.firstOrNull { it.name == "disableObfuscation" }
+        extensionClass = extensionClass.superclass
+    }
+    val disableObfuscationField = requireNotNull(field) {
+        "Loom 的 disableObfuscation 属性找不到了（Loom 升级了？），26.2 变体需要它来跳过映射解析"
+    }.apply { isAccessible = true }
+    // 这个 Property 在 Loom 构造扩展时就已经 finalizeValue 了，set 会报
+    // 「The value for this property is final and cannot be changed any further」，
+    // 只能把整个属性对象换成一个已经定好值的新对象（Loom 每次都是读该字段，不做缓存）
+    disableObfuscationField.set(loomExtension, objects.property(Boolean::class.java).value(true))
+}
+
+// 非混淆环境下 Loom 的 remapJar 连属性都读不了（knownIndyBsms 会抛
+// "Cannot configure known indyBsms in a non-obfuscated environment"），而 26.x 本来也不需要
+// 重映射：类名就是 Mojang 名，mixin 注解值也无需改写。这正是官方 no-remap 插件
+// （net.fabricmc.fabric-loom）的效果——它的产物就是普通 jar。所以这里直接把 remapJar 关掉，
+// 并让 assemble 依赖普通 jar，保证 build/libs 里仍然是那份带 jar-in-jar 的完整产物。
+if (modstitch.isLoom && minecraft.startsWith("26.")) {
+    tasks.named("remapJar") { enabled = false }
+    // Loom 把普通 jar 放在 build/devlibs（带 -dev 分类），build/libs 里那份原本由 remapJar 产出。
+    // 非混淆环境不需要重映射，但 jar-in-jar 仍然要打进去，所以这里补一个只做打包的 Jar 任务，
+    // 产物路径与命名跟其他变体保持一致（build/libs/realdamage-<version>.jar）
+    val plainJar = tasks.named<Jar>("jar")
+    val noRemapJar = tasks.register<Jar>("noRemapJar") {
+        dependsOn(plainJar, "processIncludeJars")
+        from(plainJar.map { zipTree(it.archiveFile.get().asFile) })
+        // processIncludeJars 是 Loom 把 include 的依赖摊开的地方（big-math、nightconfig）
+        from(tasks.named("processIncludeJars")) { into("META-INF/jars") }
+        archiveFileName.set(plainJar.map { "${it.archiveBaseName.get()}-${it.archiveVersion.get()}.jar" })
+        destinationDirectory.set(layout.buildDirectory.dir("libs"))
+    }
+    tasks.named("assemble") { dependsOn(noRemapJar) }
+}
+
 // Stonecutter 常量：供 //? if <loader> { 注释守卫使用
 stonecutter {
     consts(
@@ -258,8 +311,24 @@ dependencies {
         implementation("com.electronwill.night-config:toml:$nightConfigVersion")
         add("modstitchJiJ", "com.electronwill.night-config:core:$nightConfigVersion")
         add("modstitchJiJ", "com.electronwill.night-config:toml:$nightConfigVersion")
-        // Fabric 的命令注册靠 Fabric API；modImplementation 由 Loom 提供
-        add("modImplementation", "net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
+        // 26.x 起 MC 不再混淆，Loom 走 no-remap 分支，modImplementation 这些 remap 配置不再
+        // 汇入 compileClasspath（官方 26.2 模板也是直接用 implementation 声明 fabric-loader 与
+        // fabric-api 的）。Modstitch 固定往 modImplementation 上加 fabric-loader，所以 26.x 这里
+        // 必须再补一份普通配置，否则 loader / api / mixin 的类全都不在编译类路径上。
+        if (minecraft.startsWith("26.")) {
+            implementation("net.fabricmc:fabric-loader:$fabricLoaderVersion")
+        }
+        val fabricDependencyConfiguration =
+            if (minecraft.startsWith("26.")) "implementation" else "modImplementation"
+        // Fabric 的命令注册靠 Fabric API
+        add(fabricDependencyConfiguration, "net.fabricmc.fabric-api:fabric-api:$fabricApiVersion")
+        // 26.x 起 Fabric API 的 bundle 里不再包含 gametest 模块（0.149 ~ 0.161 的所有 26.2 构建里
+        // 都没有 fabric-gametest-api-v1），而 Fabric 侧的 GameTest 就靠它提供 @GameTest 与
+        // fabric-api.gametest 开关，所以 26.2 变体单独声明一份（版本按该模块 manifest 里的
+        // Fabric-Minecraft-Version = 26.2 挑最新的一版）。旧变体仍然由 bundle 自带，不需要这一项。
+        prop("deps.fabricGametest") {
+            add(fabricDependencyConfiguration, "net.fabricmc.fabric-api:fabric-gametest-api-v1:$it")
+        }
     }
 }
 

@@ -31,9 +31,7 @@ stonecutter {
         mc("1.21.1", loaders = listOf("neoforge", "fabric"))
         mc("1.21.11", loaders = listOf("neoforge", "fabric"))
         // 26.x 起 Mojang 改用「年份.序号」的版本号体系，26.2 对应 2026 年的第二个正式版
-        // 26.2 的 fabric 变体暂时无法注册：Modstitch 0.5.x 的 Loom 路径无条件加 officialMojangMappings()，
-        // 而 26.x 起 MC 不再混淆、版本清单里没有 client_mappings，Loom 1.16.2 会在这里直接失败
-        mc("26.2", loaders = listOf("neoforge"))
+        mc("26.2", loaders = listOf("neoforge", "fabric"))
 
         // src/ 以该变体的代码形态提交，其他变体由预处理器生成
         vcsVersion = "1.20.1-forge"
