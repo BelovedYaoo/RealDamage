@@ -77,7 +77,8 @@ dependencies {
     // 编译期需要该库；运行时由下面的 jarJar 步骤打进产物
     implementation 'ch.obermuhlner:big-math:2.3.2'
     // FG 4.1 没有 jarJar 配置（apply 时直接报 "Could not get unknown property 'jarJar'"），
-    // 所以另建 bundledLibrary 配置，手工做 jar-in-jar
+    // 而 1.16.5 的 Forge 运行时也没有 jar-in-jar 协议（见下面 jar 任务的长注释），
+    // 所以另建 bundledLibrary 配置，由 jar 任务把库的 class 摊进产物
     bundledLibrary 'ch.obermuhlner:big-math:2.3.2'
 
     // nightconfig 由 Forge 1.16.5 自带（userdev config.json 的 libraries 里写明 core/toml 3.6.3），
@@ -86,55 +87,25 @@ dependencies {
     compileOnly 'com.electronwill.night-config:toml:3.6.3'
 }
 
-// 手工 jar-in-jar。
+// big-math 必须真的进产物，但 Forge 1.16.5 没有 jar-in-jar。
 //
-// Forge 1.16.4+ 由 JarJarDependencyLocator 在 mod 发现阶段读取 jar 内的
-// META-INF/jarjar/metadata.json，把其中声明的嵌套 jar 注册成同一个 mod 的依赖，
-// 因此「把 jar 塞进 META-INF/jarjar/ + 写一份 metadata.json」就是完整的协议。
-// 之所以不依赖 Gradle 插件：ForgeGradle 4.1 没有这个能力，而 1.16.5 也不存在
-// 更现代的 MDG/Loom 那条 jarJar 配置。
-def jarJarDir = file("$buildDir/jarjar")
-
-task generateJarJarMetadata {
-    // 嵌套 jar 的名字必须和 metadata.json 里的 path 完全一致，所以两边都从同一个
-    // 依赖坐标推导，避免手写两处后不同步
-    def libraryCoordinate = 'ch.obermuhlner:big-math:2.3.2'
-    def group = libraryCoordinate.split(':')[0]
-    def artifact = libraryCoordinate.split(':')[1]
-    def libraryVersion = libraryCoordinate.split(':')[2]
-    def nestedName = "${artifact}-${libraryVersion}.jar"
-    inputs.property 'coordinate', libraryCoordinate
-    outputs.dir jarJarDir
-    doLast {
-        jarJarDir.mkdirs()
-        new File(jarJarDir, 'metadata.json').text = """{
-  "jars": [
-    {
-      "identifier": {
-        "group": "${group}",
-        "artifact": "${artifact}"
-      },
-      "version": {
-        "range": "[${libraryVersion},)",
-        "artifactVersion": "${libraryVersion}"
-      },
-      "path": "META-INF/jarjar/${nestedName}",
-      "isObfuscated": false
-    }
-  ]
-}
-"""
-    }
-}
-
+// 这不是推测：把 1.16.5-36.2.42 的专用服务端装好之后，整个 install（包括
+// forge-1.16.5-36.2.42.jar、universal、libraries/ 下全部 jar）里搜不到任何
+// JarInJar / jarjar 类或字符串，FML 的 mod 发现只有 ModsFolderLocator、
+// ExplodedDirectoryLocator、MavenDirectoryLocator、MinecraftLocator 四个；
+// 也就是说 META-INF/jarjar 那套协议（1.17 起才有 JarInJarDependencyLocator）
+// 在这一代根本不会被读取——实测表现就是启动时
+// "java.lang.NoClassDefFoundError: ch/obermuhlner/math/big/BigDecimalMath"。
+//
+// 所以 Forge 侧改成把库的 class 直接摊进自己的 jar（1.16.5 时代的通行做法）。
+// big-math 是 MIT 许可，随产物一起分发没有额外义务；ngithconfig 不用打包，
+// 因为 Forge 1.16.5 运行时就自带。
 jar {
-    dependsOn generateJarJarMetadata
-    // 嵌套 jar 必须放在 META-INF/jarjar/ 下，且文件名与 metadata.json 里的 path 一致
-    from(configurations.bundledLibrary) {
-        into 'META-INF/jarjar'
-    }
-    from(jarJarDir) {
-        into 'META-INF/jarjar'
+    from({ configurations.bundledLibrary.collect { zipTree(it) } }) {
+        // 库自带的清单/签名不能覆盖我们自己的，模块描述也不需要
+        exclude 'META-INF/MANIFEST.MF'
+        exclude 'META-INF/*.SF', 'META-INF/*.DSA', 'META-INF/*.RSA'
+        exclude 'module-info.class'
     }
     // 开发期自检类不进产物：它们只在 dev run 里由系统属性触发
     exclude '**/devtest/**'
