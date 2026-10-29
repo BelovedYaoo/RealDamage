@@ -1,0 +1,12 @@
+// 1.16.5 的 Forge 侧是一套独立构建：ForgeGradle 4.1 与 Fabric Loom 0.11 对 Gradle/JVM 的要求
+// 不一致，塞进同一个 Gradle 构建会互相牵连（插件 classpath、mappings 配置、reobf 任务互相覆盖），
+// 因此 forge / fabric 各自持有一份 settings + build 脚本，只共享 ../common 下的源码目录。
+pluginManagement {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net/' }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'realdamage-1.16.5-forge'

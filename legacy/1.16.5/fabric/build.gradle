@@ -1,0 +1,85 @@
+plugins {
+    // Loom 0.11 是 1.16.5/1.17 那一代仍在维护的最后几条支线，Gradle 7.x
+    id 'fabric-loom' version '0.11.6'
+}
+
+version = '1.0.0'
+group = 'top.bemylover.realdamage'
+archivesBaseName = 'realdamage-1.16.5-fabric'
+
+// MC 1.16.5 的运行时是 Java 8，产物字节码必须是 8
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+// 共享源码：与加载器无关的配置层/算法层/命令由 ../common 提供，
+// 本工程只补 Fabric 专属的入口点与 mixin
+sourceSets {
+    main {
+        java.srcDirs = ['src/main/java', '../common/src/main/java', '../common/src/devtest/java']
+        resources.srcDirs = ['src/main/resources', '../common/src/main/resources']
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    minecraft "com.mojang:minecraft:1.16.5"
+    // 用 Mojang 官方映射而不是 Yarn：common 源码与 main 分支共用同一套 Mojang 名，
+    // 移植时不需要整份改名（Loom 会在 remapJar 阶段把类名/方法名重映射成 intermediary）
+    mappings officialMojangMappings()
+
+    // Fabric Loader 0.14.x 仍然支持 Java 8（1.16.5 的运行时就是 Java 8），
+    // 0.15 之后的新版本对本版本没有增益，反而引入了更高的 JVM 要求
+    modImplementation "net.fabricmc:fabric-loader:0.14.24"
+    // 1.16 支线的最后一版 Fabric API；命令注册（CommandRegistrationCallback）由它提供
+    modImplementation "net.fabricmc.fabric-api:fabric-api:0.42.0+1.16"
+
+    // big-math 与 nightconfig 在 Fabric 的运行时里都没有，必须随产物 jar-in-jar 分发。
+    // nightconfig 版本对齐 Forge 1.16.5 自带的 3.6.3，保证两个加载器编译到的 API 面一致
+    implementation 'ch.obermuhlner:big-math:2.3.2'
+    include 'ch.obermuhlner:big-math:2.3.2'
+    implementation 'com.electronwill.night-config:core:3.6.3'
+    include 'com.electronwill.night-config:core:3.6.3'
+    implementation 'com.electronwill.night-config:toml:3.6.3'
+    include 'com.electronwill.night-config:toml:3.6.3'
+}
+
+loom {
+    // 1.16.5 的 Loom 0.11 走的是「注解处理器生成 refmap」那条路（Loom 1.x 才改成
+    // 在 remapJar 阶段直接改写注解值），所以这里必须给出 refmap 名，
+    // 产物里的 mixin 注解值会被它改写成 intermediary 名
+    mixin {
+        defaultRefmapName = 'realdamage-refmap.json'
+    }
+}
+
+// 开发期两个可选项，都靠系统属性打开（-Drealdamage.selftest=1 / -Drealdamage.mixinExport=1）
+tasks.withType(JavaExec).configureEach {
+    if (System.getProperty('realdamage.selftest') != null) {
+        systemProperty 'realdamage.selftest', System.getProperty('realdamage.selftest')
+    }
+    if (System.getProperty('realdamage.mixinExport') != null) {
+        // 导出注入后的类，供字节码级核对注入点
+        systemProperty 'mixin.debug.export', 'true'
+    }
+}
+
+processResources {
+    inputs.property 'version', project.version
+    filesMatching('fabric.mod.json') {
+        expand(
+                version: project.version,
+                minecraft_version_range: '~1.16.5',
+                loader_version_range: '>=0.14.24'
+        )
+    }
+    // 开发期自检类不进产物：它们只在 dev run 里由系统属性触发
+    exclude '**/devtest/**'
+}
+
+jar {
+    // 自检类只用于开发期验证，不随产物分发
+    exclude '**/devtest/**'
+}

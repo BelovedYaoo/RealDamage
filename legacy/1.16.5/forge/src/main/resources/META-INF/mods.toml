@@ -1,0 +1,26 @@
+modLoader = "javafml"
+# 1.16.5 那一代的 Forge 版本号还带 36. 前缀，语言加载器版本就是 Forge 版本本身
+loaderVersion = "[36,)"
+license = "0BSD"
+
+[[mods]]
+    modId = "realdamage"
+    version = "${version}"
+    displayName = "Real Damage"
+    authors = "PrefersMin"
+    description = '''Do you like this?'''
+    logoFile = "logo.png"
+
+[[dependencies.realdamage]]
+    modId = "forge"
+    mandatory = true
+    versionRange = "${forge_version_range}"
+    ordering = "NONE"
+    side = "BOTH"
+
+[[dependencies.realdamage]]
+    modId = "minecraft"
+    mandatory = true
+    versionRange = "${minecraft_version_range}"
+    ordering = "NONE"
+    side = "BOTH"

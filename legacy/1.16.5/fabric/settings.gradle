@@ -1,0 +1,11 @@
+// 1.16.5 的 Fabric 侧同样是独立构建（见 forge/settings.gradle 的说明）：
+// Loom 0.11 只用 Gradle 7.x，而 ForgeGradle 4.1 只认 Gradle 6.x，两者无法共用同一个 Gradle JVM。
+pluginManagement {
+    repositories {
+        maven { url = 'https://maven.fabricmc.net/' }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+rootProject.name = 'realdamage-1.16.5-fabric'

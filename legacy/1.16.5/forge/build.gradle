@@ -1,0 +1,179 @@
+// Forge 1.16.5 侧构建：ForgeGradle 4.1 是这条 MC 线唯一可用的工具链
+// （Modstitch / ModDevGradle legacyforge 走的 NeoForm Runtime 直接拒绝 1.17 之前的版本），
+// 而 ForgeGradle 4.1 只支持 Gradle 6.x（见 gradle/wrapper/gradle-wrapper.properties 里的实测报错）。
+plugins {
+    id 'net.minecraftforge.gradle' version '4.1.16'
+}
+
+version = '1.0.0'
+group = 'top.bemylover.realdamage'
+archivesBaseName = 'realdamage-1.16.5-forge'
+
+// MC 1.16.5 的运行时是 Java 8（version.json 里 javaVersion.majorVersion = 8），
+// 所以产物字节码必须是 8，编译与冒烟测试也都用 JDK 8，避免用到运行时没有的 API。
+sourceCompatibility = JavaVersion.VERSION_1_8
+targetCompatibility = JavaVersion.VERSION_1_8
+
+// 源码里的注释与字符串都是 UTF-8 中文；JDK 8 的 javac 在 Windows 上默认按 GBK 解码，
+// 不显式指定就会报「编码GBK的不可映射字符」并中断编译
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+}
+
+// ForgeGradle 4.1.16 的 official 渠道会把中间映射写到下面两个缓存目录，但不会先创建它们，
+// 冷缓存首次构建会直接抛 NoSuchFileException（实测两个：
+//   mcp_repo/de/oceanlabs/mcp/mcp_config/1.16.5/mcp_config-1.16.5-obf_to_srg.tsrg
+//   minecraft_user_repo/de/oceanlabs/mcp/mcp_config/1.16.5-20210115.111550/srg_to_official_1.16.5.tsrg
+// ），所以这里在配置阶段先把目录建好。路径本身取自 FG 的 cache base，不写死用户的绝对路径。
+def forgeGradleCache = file("${gradle.gradleUserHomeDir}/caches/forge_gradle")
+[   "mcp_repo/de/oceanlabs/mcp/mcp_config/1.16.5",
+    "minecraft_user_repo/de/oceanlabs/mcp/mcp_config/1.16.5-20210115.111550",
+].each { new File(forgeGradleCache, it).mkdirs() }
+
+// 共享源码：与加载器无关的配置层/算法层/命令由 ../common 提供，
+// 本工程只补 Forge 专属的入口点与事件处理器。两个加载器编译的是同一份文件，
+// 数值行为因此不会因为入口不同而漂移。
+sourceSets {
+    main {
+        java.srcDirs = ['src/main/java', '../common/src/main/java', '../common/src/devtest/java']
+        resources.srcDirs = ['src/main/resources', '../common/src/main/resources']
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+// 只用来取「需要打进产物」的库文件：ForgeGradle 4.1 没有 jarJar 配置，见下面 jar 任务的说明
+configurations {
+    bundledLibrary
+}
+
+minecraft {
+    // 1.16.5 是官方映射可用的版本（userdev 的 mcp_config 1.16.5-20210115 内含 official 映射），
+    // 用 official 而不是 MCP snapshot，是为了让 common 源码与 main 分支一样用 Mojang 名，
+    // 移植时不需要整份改名。
+    mappings channel: 'official', version: '1.16.5'
+
+    runs {
+        client {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            mods { realdamage { source sourceSets.main } }
+        }
+        server {
+            workingDirectory project.file('run')
+            property 'forge.logging.console.level', 'debug'
+            // 冒烟/自检跑在服务端；nogui 让它在无显示器环境里也能起
+            args '-nogui'
+            mods { realdamage { source sourceSets.main } }
+        }
+    }
+}
+
+dependencies {
+    minecraft 'net.minecraftforge:forge:1.16.5-36.2.42'
+
+    // 编译期需要该库；运行时由下面的 jarJar 步骤打进产物
+    implementation 'ch.obermuhlner:big-math:2.3.2'
+    // FG 4.1 没有 jarJar 配置（apply 时直接报 "Could not get unknown property 'jarJar'"），
+    // 所以另建 bundledLibrary 配置，手工做 jar-in-jar
+    bundledLibrary 'ch.obermuhlner:big-math:2.3.2'
+
+    // nightconfig 由 Forge 1.16.5 自带（userdev config.json 的 libraries 里写明 core/toml 3.6.3），
+    // 这里只补一份同版本的编译期依赖，保证编译到的 API 面就是运行时真正的那一份。
+    compileOnly 'com.electronwill.night-config:core:3.6.3'
+    compileOnly 'com.electronwill.night-config:toml:3.6.3'
+}
+
+// 手工 jar-in-jar。
+//
+// Forge 1.16.4+ 由 JarJarDependencyLocator 在 mod 发现阶段读取 jar 内的
+// META-INF/jarjar/metadata.json，把其中声明的嵌套 jar 注册成同一个 mod 的依赖，
+// 因此「把 jar 塞进 META-INF/jarjar/ + 写一份 metadata.json」就是完整的协议。
+// 之所以不依赖 Gradle 插件：ForgeGradle 4.1 没有这个能力，而 1.16.5 也不存在
+// 更现代的 MDG/Loom 那条 jarJar 配置。
+def jarJarDir = file("$buildDir/jarjar")
+
+task generateJarJarMetadata {
+    // 嵌套 jar 的名字必须和 metadata.json 里的 path 完全一致，所以两边都从同一个
+    // 依赖坐标推导，避免手写两处后不同步
+    def libraryCoordinate = 'ch.obermuhlner:big-math:2.3.2'
+    def group = libraryCoordinate.split(':')[0]
+    def artifact = libraryCoordinate.split(':')[1]
+    def libraryVersion = libraryCoordinate.split(':')[2]
+    def nestedName = "${artifact}-${libraryVersion}.jar"
+    inputs.property 'coordinate', libraryCoordinate
+    outputs.dir jarJarDir
+    doLast {
+        jarJarDir.mkdirs()
+        new File(jarJarDir, 'metadata.json').text = """{
+  "jars": [
+    {
+      "identifier": {
+        "group": "${group}",
+        "artifact": "${artifact}"
+      },
+      "version": {
+        "range": "[${libraryVersion},)",
+        "artifactVersion": "${libraryVersion}"
+      },
+      "path": "META-INF/jarjar/${nestedName}",
+      "isObfuscated": false
+    }
+  ]
+}
+"""
+    }
+}
+
+jar {
+    dependsOn generateJarJarMetadata
+    // 嵌套 jar 必须放在 META-INF/jarjar/ 下，且文件名与 metadata.json 里的 path 一致
+    from(configurations.bundledLibrary) {
+        into 'META-INF/jarjar'
+    }
+    from(jarJarDir) {
+        into 'META-INF/jarjar'
+    }
+    // 开发期自检类不进产物：它们只在 dev run 里由系统属性触发
+    exclude '**/devtest/**'
+    manifest {
+        attributes([
+                'Specification-Title'   : 'realdamage',
+                'Specification-Vendor'  : 'PrefersMin',
+                'Specification-Version' : '1',
+                'Implementation-Title'  : project.name,
+                'Implementation-Version': project.version,
+                'Implementation-Vendor' : 'PrefersMin',
+        ])
+    }
+}
+
+// 开发期两个可选项，都靠系统属性打开（-Drealdamage.selftest=1 / -Drealdamage.mixinExport=1）
+tasks.withType(JavaExec).configureEach {
+    if (System.getProperty('realdamage.selftest') != null) {
+        systemProperty 'realdamage.selftest', System.getProperty('realdamage.selftest')
+    }
+    if (System.getProperty('realdamage.mixinExport') != null) {
+        // 导出注入后的类，供字节码级核对注入点
+        systemProperty 'mixin.debug.export', 'true'
+    }
+}
+
+processResources {
+    // 模板里有中文注释，而 Gradle 默认按平台编码（Windows 上是 GBK）读写被替换的文件，
+    // 不指定就会把清单里的中文写坏（实测 mods.toml 变成不可解码的字节序列）
+    filteringCharset = 'UTF-8'
+    // 清单模板里的占位符：与 main 分支同样的做法，只是这里手写而不是走 Modstitch
+    inputs.property 'version', project.version
+    filesMatching('META-INF/mods.toml') {
+        expand(
+                version: project.version,
+                forge_version_range: '[36,)',
+                minecraft_version_range: '[1.16.5,1.17)'
+        )
+    }
+    // 开发期自检类不进产物
+    exclude '**/devtest/**'
+}
