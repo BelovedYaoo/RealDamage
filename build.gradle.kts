@@ -217,6 +217,12 @@ tasks.named<ProcessResources>("processResources") {
     filesMatching(listOf("$modIdConst.mixins.json", "$modIdConst-fabric.mixins.json")) {
         expand(mapOf("java_compatibility" to javaCompatibilityLevel))
     }
+    // Modstitch 的 applyMixinConfigToModMetadata 每次执行都会往 build/resources/main 里的清单里
+    // 再追加一遍同一份 mixin 配置；而 processResources 一旦 UP-TO-DATE 就不会重新生成该文件，
+    // 于是从第二次开发运行起 fabric.mod.json 里就会出现重复的 mixin 配置，Fabric 直接拒绍启动：
+    // Non-unique Mixin config name realdamage-fabric.mixins.json used by the mods realdamage and realdamage。
+    // 正式产物的清单来自 generateModMetadata，不受影响；这里只让开发期的资源始终重做一遍。
+    outputs.upToDateWhen { false }
 }
 
 // GameTest 只在开发期由 gameTestServer 运行，代码本身却被 Stonecutter 生成进了 main 源集
