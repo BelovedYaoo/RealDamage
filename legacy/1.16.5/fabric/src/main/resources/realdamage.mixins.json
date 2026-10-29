@@ -1,0 +1,15 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "top.bemylover.realdamage.mixin",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "PlayerActuallyHurtMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "refmap": "realdamage-refmap.json"
+}

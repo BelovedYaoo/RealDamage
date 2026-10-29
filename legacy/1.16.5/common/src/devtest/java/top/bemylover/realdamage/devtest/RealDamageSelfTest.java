@@ -1,8 +1,8 @@
 package top.bemylover.realdamage.devtest;
 
 import net.minecraft.server.MinecraftServer;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * 开发期数值自检：在真实服务端进程里跑完整的伤害链路。
@@ -31,7 +31,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class RealDamageSelfTest {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("RealDamage-SelfTest");
+    private static final Logger LOGGER = LogManager.getLogger("RealDamage-SelfTest");
 
     /**
      * 每次伤害的原始数值。10 点既能让护甲减免比例明显，又不会一击致死。

@@ -28,7 +28,7 @@ dependencies {
     minecraft "com.mojang:minecraft:1.16.5"
     // 用 Mojang 官方映射而不是 Yarn：common 源码与 main 分支共用同一套 Mojang 名，
     // 移植时不需要整份改名（Loom 会在 remapJar 阶段把类名/方法名重映射成 intermediary）
-    mappings officialMojangMappings()
+    mappings loom.officialMojangMappings()
 
     // Fabric Loader 0.14.x 仍然支持 Java 8（1.16.5 的运行时就是 Java 8），
     // 0.15 之后的新版本对本版本没有增益，反而引入了更高的 JVM 要求
@@ -67,6 +67,9 @@ tasks.withType(JavaExec).configureEach {
 }
 
 processResources {
+    // 清单里有中文注释，而 Gradle 默认按平台编码（Windows 上是 GBK）读写被替换的文件，
+    // 不指定就会把清单里的中文写坏（见 Forge 侧同样的问题）
+    filteringCharset = 'UTF-8'
     inputs.property 'version', project.version
     filesMatching('fabric.mod.json') {
         expand(

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "id": "realdamage",
+  "version": "${version}",
+  "name": "Real Damage",
+  "description": "Do you like this?",
+  "authors": [
+    "PrefersMin"
+  ],
+  "license": "0BSD",
+  "icon": "logo.png",
+  "environment": "*",
+  "entrypoints": {
+    "main": [
+      "top.bemylover.realdamage.RealDamage"
+    ]
+  },
+  "mixins": [
+    "realdamage.mixins.json"
+  ],
+  "depends": {
+    "fabricloader": "${loader_version_range}",
+    "fabric": "*",
+    "minecraft": "${minecraft_version_range}"
+  }
+}

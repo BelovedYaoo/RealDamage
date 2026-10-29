@@ -2,8 +2,8 @@ package top.bemylover.realdamage.util;
 
 import ch.obermuhlner.math.big.BigComplex;
 import ch.obermuhlner.math.big.BigDecimalMath;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import top.bemylover.realdamage.config.RealDamageSettings;
 
 import java.math.BigDecimal;
@@ -22,7 +22,7 @@ import java.math.RoundingMode;
  */
 public final class FunctionCalculationUtil {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("RealDamage");
+    private static final Logger LOGGER = LogManager.getLogger("RealDamage");
 
     // 判定界限，由于logistic函数无法真正到达其上界，因此当逼近程度达到99.5%时，判定为最大值
     private static final BigDecimal DECISION_LIMIT = new BigDecimal("0.995");

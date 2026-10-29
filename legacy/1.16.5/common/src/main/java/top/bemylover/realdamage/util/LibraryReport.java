@@ -2,8 +2,8 @@ package top.bemylover.realdamage.util;
 
 import ch.obermuhlner.math.big.BigDecimalMath;
 import com.electronwill.nightconfig.core.Config;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 /**
  * 启动期的第三方库自检。
@@ -20,7 +20,7 @@ import org.slf4j.LoggerFactory;
  */
 public final class LibraryReport {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("RealDamage");
+    private static final Logger LOGGER = LogManager.getLogger("RealDamage");
 
     private LibraryReport() {
     }

@@ -1,7 +1,7 @@
 package top.bemylover.realdamage.handler;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import top.bemylover.realdamage.config.RealDamageConfig;
 import top.bemylover.realdamage.config.RealDamageSettings;
 import top.bemylover.realdamage.util.FunctionCalculationUtil;
@@ -29,7 +29,7 @@ import top.bemylover.realdamage.util.FunctionCalculationUtil;
  */
 public final class RealDamageCalculator {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("RealDamage");
+    private static final Logger LOGGER = LogManager.getLogger("RealDamage");
 
     private RealDamageCalculator() {
     }

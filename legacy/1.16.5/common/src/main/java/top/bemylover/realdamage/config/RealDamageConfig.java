@@ -3,8 +3,8 @@ package top.bemylover.realdamage.config;
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
 import com.electronwill.nightconfig.core.io.WritingMode;
 import com.electronwill.nightconfig.toml.TomlFormat;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import top.bemylover.realdamage.util.FunctionCalculationUtil;
 
 import java.io.IOException;
@@ -27,7 +27,7 @@ import java.util.List;
  */
 public final class RealDamageConfig {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger("RealDamage");
+    private static final Logger LOGGER = LogManager.getLogger("RealDamage");
 
     /**
      * 配置文件名。这里写死而不引用 {@code RealDamage.MODID}：那个类带加载器注解，

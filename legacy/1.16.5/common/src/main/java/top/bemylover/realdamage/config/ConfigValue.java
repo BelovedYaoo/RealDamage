@@ -1,8 +1,8 @@
 package top.bemylover.realdamage.config;
 
 import com.electronwill.nightconfig.core.CommentedConfig;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Objects;
 
@@ -18,7 +18,10 @@ import java.util.Objects;
  */
 public abstract class ConfigValue<T> {
 
-    protected static final Logger LOGGER = LoggerFactory.getLogger("RealDamage");
+    // 日志统一用 log4j2 而不是 slf4j：1.16.5 的原版只带 log4j2（Forge 侧 2.15.0、
+    // Fabric 侧 2.8.1 来自 MC 自身的 libraries），Fabric 1.16.5 的运行时里没有 slf4j-api，
+    // 用了会在第一次打日志时 NoClassDefFoundError。
+    protected static final Logger LOGGER = LogManager.getLogger("RealDamage");
 
     // 点分路径，例如 RealDamage.Maximum.realDamageMax；保持与 main 分支生成的配置文件一致，
     // 老配置文件可以直接沿用
