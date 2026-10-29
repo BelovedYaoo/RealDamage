@@ -36,6 +36,14 @@ public final class RealDamageCalculator {
      */
     public static float splitAndApplyRealDamage(Player player, DamageSource source, float originalDamage) {
 
+        // Forge / NeoForge 的 LivingHurtEvent 是在 actuallyHurt 内部的 isInvulnerableTo 分支里
+        // 触发的，本就不会对无敌实体走到这里；Fabric 侧的 mixin 注入在方法开头，早于该检查。
+        // 在这里统一补一次判定，否则创造/旁观模式玩家、以及火焰抗性这类伤害类型免疫的情况
+        // 会在 Fabric 上被扣真实伤害，与另外两个加载器不一致。
+        if (player.isInvulnerableTo(source)) {
+            return originalDamage;
+        }
+
         // 每次结算都用同一份配置快照，避免算到一半配置被重载导致数值前后不一致
         RealDamageSettings settings = RealDamageConfig.settings();
         FunctionCalculationUtil.Parameters parameters = RealDamageConfig.functionParameters();
