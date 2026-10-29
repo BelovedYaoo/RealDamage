@@ -4,8 +4,8 @@ import com.mojang.logging.LogUtils;
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 //? if >=1.21.5 {
-/*import net.minecraft.network.chat.Component;
-*///?}
+import net.minecraft.network.chat.Component;
+//?}
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.EquipmentSlot;
@@ -175,10 +175,10 @@ public final class RealDamageGameTestSupport {
         DamageSource source = attackDamage(helper.getLevel(), player);
         // 1.21.2 起这个判定要带上 ServerLevel（Entity#isInvulnerableTo 的签名变了）
         //? if >=1.21.2 {
-        /*check(player.isInvulnerableTo(helper.getLevel(), source), "前置条件：无敌玩家应当对 player_attack 免疫");
-        *///?} else {
-        check(player.isInvulnerableTo(source), "前置条件：无敌玩家应当对 player_attack 免疫");
-        //?}
+        check(player.isInvulnerableTo(helper.getLevel(), source), "前置条件：无敌玩家应当对 player_attack 免疫");
+        //?} else {
+        /*check(player.isInvulnerableTo(source), "前置条件：无敌玩家应当对 player_attack 免疫");
+        *///?}
         float healthBefore = player.getHealth();
 
         float drop = hurtAndMeasureHealthDrop(player, source);
@@ -234,18 +234,18 @@ public final class RealDamageGameTestSupport {
      * <p>1.21 起 {@code makeMockPlayer} 多了一个 GameType 参数，这里按版本分支。</p>
      */
     //? if >=1.21 {
-    /*static Player spawnMockPlayer(GameTestHelper helper) {
+    static Player spawnMockPlayer(GameTestHelper helper) {
         Player player = helper.makeMockPlayer(net.minecraft.world.level.GameType.SURVIVAL);
         player.setHealth(player.getMaxHealth());
         return player;
     }
-    *///?} else {
-    static Player spawnMockPlayer(GameTestHelper helper) {
+    //?} else {
+    /*static Player spawnMockPlayer(GameTestHelper helper) {
         Player player = helper.makeMockPlayer();
         player.setHealth(player.getMaxHealth());
         return player;
     }
-    //?}
+    *///?}
 
     /**
      * 给玩家穿上全套钻石甲，并让它立刻生效。
@@ -343,10 +343,10 @@ public final class RealDamageGameTestSupport {
     private static void check(boolean condition, String message) {
         if (!condition) {
             //? if >=1.21.5 {
-            /*throw new GameTestAssertException(Component.literal(message), 0);
-            *///?} else {
-            throw new GameTestAssertException(message);
-            //?}
+            throw new GameTestAssertException(Component.literal(message), 0);
+            //?} else {
+            /*throw new GameTestAssertException(message);
+            *///?}
         }
     }
 }

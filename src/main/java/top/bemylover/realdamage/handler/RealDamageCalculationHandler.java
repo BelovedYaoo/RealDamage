@@ -2,16 +2,16 @@ package top.bemylover.realdamage.handler;
 
 import net.minecraft.world.entity.player.Player;
 //? if forge {
-import net.minecraftforge.event.entity.living.LivingHurtEvent;
+/*import net.minecraftforge.event.entity.living.LivingHurtEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-//?}
+*///?}
 
 //? if neoforge {
-/*import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.living.LivingIncomingDamageEvent;
-*///?}
+//?}
 import top.bemylover.realdamage.RealDamage;
 
 /**
@@ -27,15 +27,15 @@ import top.bemylover.realdamage.RealDamage;
  * @version 1.0
  */
 //? if forge {
-@Mod.EventBusSubscriber(modid = RealDamage.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
-//?}
-//? if neoforge {
-/*@EventBusSubscriber(modid = RealDamage.MODID)
+/*@Mod.EventBusSubscriber(modid = RealDamage.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 *///?}
+//? if neoforge {
+@EventBusSubscriber(modid = RealDamage.MODID)
+//?}
 public class RealDamageCalculationHandler {
 
     //? if forge {
-    @SubscribeEvent
+    /*@SubscribeEvent
     public static void onLivingHurt(LivingHurtEvent event) {
         // 判断受伤实体是否为玩家
         if (!(event.getEntity() instanceof Player player)) {
@@ -44,10 +44,10 @@ public class RealDamageCalculationHandler {
         // 真实伤害已在 RealDamageCalculator 里直接扣血，这里只把剩余伤害交回原版继续走护甲结算
         event.setAmount(RealDamageCalculator.splitAndApplyRealDamage(player, event.getSource(), event.getAmount()));
     }
-    //?}
+    *///?}
 
     //? if neoforge {
-    /*@SubscribeEvent
+    @SubscribeEvent
     public static void onLivingHurt(LivingIncomingDamageEvent event) {
         // 判断受伤实体是否为玩家
         if (!(event.getEntity() instanceof Player player)) {
@@ -56,6 +56,6 @@ public class RealDamageCalculationHandler {
         // 真实伤害已在 RealDamageCalculator 里直接扣血，这里只把剩余伤害交回原版继续走护甲结算
         event.setAmount(RealDamageCalculator.splitAndApplyRealDamage(player, event.getSource(), event.getAmount()));
     }
-    *///?}
+    //?}
 
 }

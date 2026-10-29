@@ -1,7 +1,7 @@
 package top.bemylover.realdamage.gametest;
 
 //? if neoforge && >=1.21.11 {
-/*import com.mojang.serialization.MapCodec;
+import com.mojang.serialization.MapCodec;
 import java.util.function.Consumer;
 import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
@@ -15,7 +15,7 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.RegisterGameTestsEvent;
 import top.bemylover.realdamage.RealDamage;
-*///?}
+//?}
 
 //? if neoforge && <1.21.11 {
 /*import net.minecraft.gametest.framework.GameTest;
@@ -48,10 +48,10 @@ import net.neoforged.neoforge.gametest.PrefixGameTestTemplate;
  * （反编译 fml 的 {@code AutomaticEventSubscriber} 核实），而这个事件正是 {@code IModBusEvent}。</p>
  */
 //? if neoforge && >=1.21.11 {
-/*@EventBusSubscriber(modid = RealDamage.MODID)
+@EventBusSubscriber(modid = RealDamage.MODID)
 public final class NeoForgeRealDamageGameTests {
 
-    /^* 每个测试都是同步跑完的，20 tick 足够；结构体只提供一个空场地。 ^/
+    /** 每个测试都是同步跑完的，20 tick 足够；结构体只提供一个空场地。 */
     private static final int MAX_TICKS = 20;
 
     private NeoForgeRealDamageGameTests() {
@@ -84,13 +84,13 @@ public final class NeoForgeRealDamageGameTests {
                 new SupportBackedTestInstance(body, testData));
     }
 
-    /^*
+    /**
      * 把 {@link RealDamageGameTestSupport} 里的测试体包成原版要求的测试实例。
      *
      * <p>{@code codec()} 只在把注册表序列化成数据包时才被调用，gametest 服务端不会走那条路径，
      * 因此直接抛异常标明「本实例不可序列化」，而不是伪造一个会误导人的编码器；
      * {@code typeDescription()} 只用于测试报告里的类型说明，写模组名即可。</p>
-     ^/
+     */
     private static final class SupportBackedTestInstance extends GameTestInstance {
 
         private final Consumer<GameTestHelper> body;
@@ -117,7 +117,7 @@ public final class NeoForgeRealDamageGameTests {
         }
     }
 }
-*///?}
+//?}
 //? if neoforge && <1.21.11 {
 /*@GameTestHolder("realdamage")
 // 同 Forge：默认为 true 时结构体名会被加上类名前缀，与资源文件对不上

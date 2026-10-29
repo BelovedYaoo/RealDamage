@@ -34,34 +34,39 @@ val javaTargetVersion = when (minecraft) {
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的 Java 版本")
 }
 
-// 每个 MC 版本对应的资源包/数据包格式号，写错会让客户端提示资源包不兼容。
-// 1.21.9（快照 25w31a）起 pack.mcmeta 的格式声明从单一 pack_format 换成 min_format/max_format，
-// 而且资源包与数据包各自独立编号（1.21.11 是资源包 75.0 / 数据包 94.1）。
-// 模组 jar 里这份 pack.mcmeta 同时被当作资源包与数据包声明读取，所以新版本要写成覆盖两者的区间，
-// 具体字段文本由 packFormatFields 生成，模板里只留一个占位符。
+// 每个 MC 版本的资源包/数据包格式号，写错会让客户端提示资源包不兼容。
+// 1.21.9（快照 25w31a）起格式号带次版本号，字段也从单一 pack_format 换成 min_format/max_format
+//（1.21.11 的取值来自客户端 jar 里的 version.json：资源包 75.0、数据包 94.1）。
+data class PackFormat(val major: Int, val minor: Int)
+
 val resourcePackFormat = when (minecraft) {
-    "1.19.2" -> 9
-    "1.20.1" -> 15
-    "1.21.1" -> 34
-    "1.21.11" -> 75
+    "1.19.2" -> PackFormat(9, 0)
+    "1.20.1" -> PackFormat(15, 0)
+    "1.21.1" -> PackFormat(34, 0)
+    "1.21.11" -> PackFormat(75, 0)
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的资源包格式版本")
 }
 
-// 数据包格式号；1.21.9 之前与资源包同号，模板里也就只写一个字段
 val dataPackFormat = when (minecraft) {
-    "1.19.2" -> 9
-    "1.20.1" -> 15
-    "1.21.1" -> 34
-    "1.21.11" -> 94
+    "1.19.2" -> PackFormat(9, 0)
+    "1.20.1" -> PackFormat(15, 0)
+    "1.21.1" -> PackFormat(34, 0)
+    "1.21.11" -> PackFormat(94, 1)
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的数据包格式版本")
 }
 
-val packFormatFields = if (resourcePackFormat == dataPackFormat && minecraft != "1.21.11") {
-    // 1.21.9 之前的写法：单一字段
-    "\"pack_format\": $resourcePackFormat"
+// 1.21.9 之前的写法是单一 pack_format（两种包同号）；之后模组 jar 里这份 pack.mcmeta 会被
+// 资源包与数据包各解析一次，而两者的兼容校验互斥：数据包格式号仍 <= 1.21.8 的旧号时必须额外
+// 声明 supported_formats，资源包一侧则明令禁止 supported_formats。也就是说单一文件无法同时
+// 声明两种包，只能选一种：模组 jar 里真正要加载的内容（测试结构体等）都在数据包侧，
+// 资源包侧本来就没有 assets，因此按数据包格式号声明——这与 NeoForge 21.11 自己的
+// pack.mcmeta（min_format/max_format 直接写 [94, 1]）是同一做法。
+val usesModernPackFormat = minecraft == "1.21.11"
+val packFormatFields = if (usesModernPackFormat) {
+    "\"min_format\": [${dataPackFormat.major}, ${dataPackFormat.minor}], " +
+            "\"max_format\": [${dataPackFormat.major}, ${dataPackFormat.minor}]"
 } else {
-    // 1.21.9 起：min/max 要同时容得下资源包与数据包两种格式号
-    "\"min_format\": ${minOf(resourcePackFormat, dataPackFormat)}, \"max_format\": ${maxOf(resourcePackFormat, dataPackFormat)}"
+    "\"pack_format\": ${resourcePackFormat.major}"
 }
 
 // mixins.json 的 compatibilityLevel 必须不低于 mixin 类自身的字节码版本，
@@ -153,7 +158,7 @@ modstitch {
         replacementProperties.populate {
             put("mod_license", "0BSD")
             put("mod_description", "Do you like this?")
-            put("pack_format", resourcePackFormat.toString())
+            put("pack_format", resourcePackFormat.major.toString())
             put("pack_format_fields", packFormatFields)
             put("java_compatibility", javaCompatibilityLevel)
             put("loader_mod_id", loaderManifest.modId)

@@ -2,8 +2,8 @@ package top.bemylover.realdamage.handler;
 
 import com.mojang.logging.LogUtils;
 //? if >=1.21.2 {
-/*import net.minecraft.server.level.ServerLevel;
-*///?}
+import net.minecraft.server.level.ServerLevel;
+//?}
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.player.Player;
 import org.slf4j.Logger;
@@ -49,14 +49,14 @@ public final class RealDamageCalculator {
         // ServerLevel（GameTest 的假玩家同样挂在 ServerLevel 上）；万一拿不到（理论上不会），
         // 就按「免疫」处理：宁可这一击不扣真实伤害，也不要绕过无敌判定。
         //? if >=1.21.2 {
-        /*if (!(player.level() instanceof ServerLevel serverLevel) || player.isInvulnerableTo(serverLevel, source)) {
+        if (!(player.level() instanceof ServerLevel serverLevel) || player.isInvulnerableTo(serverLevel, source)) {
             return originalDamage;
         }
-        *///?} else {
-        if (player.isInvulnerableTo(source)) {
+        //?} else {
+        /*if (player.isInvulnerableTo(source)) {
             return originalDamage;
         }
-        //?}
+        *///?}
 
         // 每次结算都用同一份配置快照，避免算到一半配置被重载导致数值前后不一致
         RealDamageSettings settings = RealDamageConfig.settings();
