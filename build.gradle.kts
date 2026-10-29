@@ -25,18 +25,24 @@ val fabricApiVersion = findProperty("deps.fabricApi") as? String ?: ""
 // 版本对齐 1.20.1 Forge 内置的 3.6.4，保证三个加载器用到的 API 子集是同一份
 val nightConfigVersion = "3.6.4"
 
-// 1.21 起运行时最低就是 Java 21；构建 JVM 本身由 Modstitch 要求为 21，两者在 1.21 上重合
+// 每个 MC 版本要求的最低运行时 Java，也是产物字节码版本：
+// 26.2 的 version.json 写的是 java_version = 25（java-runtime-epsilon），
+// 所以编译与运行都必须用 JDK 25（Fabric API 26.2 的清单里同样写着 java: ">=25"）。
+// 1.21 起运行时最低就是 Java 21；构建 JVM 本身由 Modstitch 要求为 21+，
+// 而 26.2 要求 target 25，因此构建 JVM 必须是 25（或已注册的 25 toolchain）。
 val javaTargetVersion = when (minecraft) {
     "1.19.2" -> 17
     "1.20.1" -> 17
     "1.21.1" -> 21
     "1.21.11" -> 21
+    "26.2" -> 25
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的 Java 版本")
 }
 
 // 每个 MC 版本的资源包/数据包格式号，写错会让客户端提示资源包不兼容。
 // 1.21.9（快照 25w31a）起格式号带次版本号，字段也从单一 pack_format 换成 min_format/max_format
-//（1.21.11 的取值来自客户端 jar 里的 version.json：资源包 75.0、数据包 94.1）。
+//（1.21.11 的取值来自客户端 jar 里的 version.json：资源包 75.0、数据包 94.1；
+//  26.2 同样是客户端 jar 里的 version.json：资源包 88.0、数据包 107.1）。
 data class PackFormat(val major: Int, val minor: Int)
 
 val resourcePackFormat = when (minecraft) {
@@ -44,6 +50,7 @@ val resourcePackFormat = when (minecraft) {
     "1.20.1" -> PackFormat(15, 0)
     "1.21.1" -> PackFormat(34, 0)
     "1.21.11" -> PackFormat(75, 0)
+    "26.2" -> PackFormat(88, 0)
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的资源包格式版本")
 }
 
@@ -52,6 +59,7 @@ val dataPackFormat = when (minecraft) {
     "1.20.1" -> PackFormat(15, 0)
     "1.21.1" -> PackFormat(34, 0)
     "1.21.11" -> PackFormat(94, 1)
+    "26.2" -> PackFormat(107, 1)
     else -> throw IllegalArgumentException("请在此登记 ${minecraft} 对应的数据包格式版本")
 }
 
@@ -61,7 +69,7 @@ val dataPackFormat = when (minecraft) {
 // 声明两种包，只能选一种：模组 jar 里真正要加载的内容（测试结构体等）都在数据包侧，
 // 资源包侧本来就没有 assets，因此按数据包格式号声明——这与 NeoForge 21.11 自己的
 // pack.mcmeta（min_format/max_format 直接写 [94, 1]）是同一做法。
-val usesModernPackFormat = minecraft == "1.21.11"
+val usesModernPackFormat = minecraft == "1.21.11" || minecraft.startsWith("26.")
 val packFormatFields = if (usesModernPackFormat) {
     "\"min_format\": [${dataPackFormat.major}, ${dataPackFormat.minor}], " +
             "\"max_format\": [${dataPackFormat.major}, ${dataPackFormat.minor}]"
@@ -118,12 +126,23 @@ val loaderManifest = when (minecraft to constraint) {
         minecraftVersionRange = "[1.21.11,1.22)",
     )
 
+    // 26.x 的 NeoForge 版本号直接跟 MC 对齐（26.2.0.93），MC 版本区间改按年份序号写。
+    // javafml 的版本门槛按 NeoForge 26.2 自己清单里的写法取 [3,)：
+    // FML 的语言加载器版本号在各代之间并不单调（21.11 自述 [3,)，这里的模组侧 1.21.11 用的却是 [4,)）
+    "26.2" to "neoforge" -> LoaderManifest(
+        modId = "neoforge",
+        versionRange = "[26.2.0,)",
+        languageVersion = "[3,)",
+        minecraftVersionRange = "[26.2,26.3)",
+    )
+
     // Fabric 的清单是 fabric.mod.json，用的是 Fabric 自己的依赖谓词语法：
     // loader 版本写成 >=x.y.z，MC 版本用 ~（同一次版本）——不能用 Forge 那边的 Maven 区间 [...]
     "1.19.2" to "fabric",
     "1.20.1" to "fabric",
     "1.21.1" to "fabric",
     "1.21.11" to "fabric",
+    "26.2" to "fabric",
     -> LoaderManifest(
         modId = "fabricloader",
         versionRange = ">=$fabricLoaderVersion",
@@ -150,8 +169,10 @@ modstitch {
         modGroup = "top.bemylover.realdamage"
         modAuthor = "PrefersMin"
 
-        // Modstitch 未内建的占位符需要自行登记；populate 是 MapProperty 的局部扩展
-        fun <K, V> MapProperty<K, V>.populate(block: MapProperty<K, V>.() -> Unit) {
+        // Modstitch 未内建的占位符需要自行登记；populate 是 MapProperty 的局部扩展。
+        // 类型参数显式约束到 Any：Gradle 9 给 MapProperty 的键值型参加了非空下界，
+        // 不写的话在 9.x 上编译期就报 "Type argument is not within its bounds"
+        fun <K : Any, V : Any> MapProperty<K, V>.populate(block: MapProperty<K, V>.() -> Unit) {
             block()
         }
 
@@ -295,7 +316,8 @@ tasks.withType<Jar>().configureEach {
 // 1.21.11 的 NeoForge 声明了 noLegacyClasspath 特性，MDG 从那一代起不再生成
 // <run>AdditionalRuntimeClasspath（往上面加依赖会直接报错），开发运行的 classpath 就是普通配置，
 // 所以这一档改走 runtimeOnly：效果同样是「运行时能看见，而产物靠 jar-in-jar 带」。
-val usesLegacyRunClasspath = minecraft != "1.21.11"
+// 26.2 沿用同一套特性（仍然后 noLegacyClasspath），所以一并走 runtimeOnly。
+val usesLegacyRunClasspath = minecraft != "1.21.11" && minecraft != "26.2"
 if (!modstitch.isLoom) {
     val devRunJarJarDependencies = listOf("ch.obermuhlner:big-math:2.3.2")
             .map { dependencies.create(it) }

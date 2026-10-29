@@ -63,10 +63,17 @@ public final class RealDamageCalculator {
         FunctionCalculationUtil.Parameters parameters = RealDamageConfig.functionParameters();
 
         // 获取当前世界天数
-        // 1.20 起 Entity#level() 取代了 getLevel()，两者只在这一处有差异
-        //? if >=1.20 {
+        // 1.20 起 Entity#level() 取代了 getLevel()，两者只在这一处有差异；
+        // 而 26.2 把世界时间整个换成了 WorldClock 体系：Level#getDayTime() 被删除，
+        // 原版自己算「第几天」（DifficultyInstance）时改用新增的 getOverworldClockTime()，
+        // 这里跟着它走，保护期的天数语义才与之前一致（主世界时钟的总 tick 数 / 24000）
+        //? if >=26.2 {
+        /*int dayTime = Math.toIntExact(player.level().getOverworldClockTime() / 24000);
+        *///?}
+        //? if >=1.20 && <26.2 {
         int dayTime = Math.toIntExact(player.level().getDayTime() / 24000);
-        //?} else {
+        //?}
+        //? if <1.20 {
         /*int dayTime = Math.toIntExact(player.getLevel().getDayTime() / 24000);
         *///?}
 

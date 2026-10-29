@@ -3,11 +3,9 @@ package top.bemylover.realdamage.gametest;
 //? if neoforge && >=1.21.11 {
 /*import com.mojang.serialization.MapCodec;
 import java.util.function.Consumer;
-import net.minecraft.core.Holder;
 import net.minecraft.gametest.framework.GameTestHelper;
 import net.minecraft.gametest.framework.GameTestInstance;
 import net.minecraft.gametest.framework.TestData;
-import net.minecraft.gametest.framework.TestEnvironmentDefinition;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.Identifier;
@@ -59,10 +57,14 @@ public final class NeoForgeRealDamageGameTests {
 
     @SubscribeEvent
     public static void registerTests(RegisterGameTestsEvent event) {
-        // 测试环境决定分批方式（原版按环境分组），这里注册一个空环境，所有用例落在同一批里
-        Holder<TestEnvironmentDefinition> environment = event.registerEnvironment(
+        // 测试环境决定分批方式（原版按环境分组），这里注册一个空环境，所有用例落在同一批里。
+        // 两处用 var 而不写显式类型：1.21.11 → 26.2 NeoForge 把 TestEnvironmentDefinition 的持有人
+        // 由 Holder<TestEnvironmentDefinition> 改成了 Holder<TestEnvironmentDefinition<?>>
+        // （反编译两个版本的 RegisterGameTestsEvent 核实），而 Holder 不变式要求参数类型逐字匹配，
+        // 用 var 让两个版本各自推导出自己的那一份，不必为此把整份类复制一遍
+        var environment = event.registerEnvironment(
                 Identifier.fromNamespaceAndPath(RealDamage.MODID, "default"));
-        TestData<Holder<TestEnvironmentDefinition>> testData = new TestData<>(
+        var testData = new TestData<>(
                 environment,
                 Identifier.fromNamespaceAndPath(RealDamage.MODID, "empty"),
                 MAX_TICKS,
@@ -77,7 +79,7 @@ public final class NeoForgeRealDamageGameTests {
     }
 
     private static void register(RegisterGameTestsEvent event,
-                                 TestData<Holder<TestEnvironmentDefinition>> testData,
+                                 TestData<?> testData,
                                  String name,
                                  Consumer<GameTestHelper> body) {
         event.registerTest(Identifier.fromNamespaceAndPath(RealDamage.MODID, name),
@@ -90,14 +92,20 @@ public final class NeoForgeRealDamageGameTests {
      * <p>{@code codec()} 只在把注册表序列化成数据包时才被调用，gametest 服务端不会走那条路径，
      * 因此直接抛异常标明「本实例不可序列化」，而不是伪造一个会误导人的编码器；
      * {@code typeDescription()} 只用于测试报告里的类型说明，写模组名即可。</p>
+     *
+     * <p>构造器为什么收 {@code TestData<?>} 再强转成 raw：
+     * 原版 {@code GameTestInstance} 的形参是 {@code TestData<Holder<TestEnvironmentDefinition<...>>>}，
+     * 它的类型参数在 1.21.11 与 26.2 上分别是 raw 与 {@code <?>}，两者是「可证明不同」的参数化，
+     * 相互强转会直接不可编译。这里只需把同一个对象交给父类，故按 raw 类型传入，
+     * 类型安全性由上面的 {@code TestData<?>} 形参保证。</p>
      ^/
     private static final class SupportBackedTestInstance extends GameTestInstance {
 
         private final Consumer<GameTestHelper> body;
 
-        private SupportBackedTestInstance(Consumer<GameTestHelper> body,
-                                          TestData<Holder<TestEnvironmentDefinition>> testData) {
-            super(testData);
+        @SuppressWarnings({"rawtypes", "unchecked"})
+        private SupportBackedTestInstance(Consumer<GameTestHelper> body, TestData<?> testData) {
+            super((TestData) testData);
             this.body = body;
         }
 

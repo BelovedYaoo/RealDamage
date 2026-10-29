@@ -1,6 +1,11 @@
 package top.bemylover.realdamage.gametest;
 
 import com.mojang.logging.LogUtils;
+//? if >=26.2 {
+/*import net.minecraft.core.Holder;
+import net.minecraft.world.clock.WorldClock;
+import net.minecraft.world.clock.WorldClocks;
+*///?}
 import net.minecraft.gametest.framework.GameTestAssertException;
 import net.minecraft.gametest.framework.GameTestHelper;
 //? if >=1.21.5 {
@@ -299,9 +304,20 @@ public final class RealDamageGameTestSupport {
      * <p>真实伤害的保护期是按「世界天数」判定的，而 GameTest 服务端默认从第 0 天开始，
      * 所以「保护期内」「保护期外」两组测试必须各自显式设定天数，
      * 否则测试之间的先后顺序会决定结果。</p>
+     *
+     * <p>26.2 起 Level#setDayTime 没了：时间改由 ServerClockManager 按「时钟」管理
+     * （原版 /time set 也是调 ServerClockManager#setTotalTicks——反编译 TimeCommand 核实），
+     * 而 {@link RealDamageCalculator} 读的是主世界时钟，两边必须指同一个时钟，
+     * 否则「设了 200 天但结算看到 0 天」这类假阳性/假阴性就会出现。</p>
      */
     static void setDay(ServerLevel level, int day) {
+        //? if >=26.2 {
+        /*Holder<WorldClock> overworldClock = level.registryAccess().get(WorldClocks.OVERWORLD).orElseThrow();
+        level.clockManager().setTotalTicks(overworldClock, 24_000L * day);
+        *///?}
+        //? if <26.2 {
         level.setDayTime(24_000L * day);
+        //?}
     }
 
     static void writeConfig(boolean limitMaximum, boolean protectionEnabled, int protectionDays, int constantProportion) {
