@@ -219,7 +219,7 @@ tasks.named<ProcessResources>("processResources") {
     }
     // Modstitch 的 applyMixinConfigToModMetadata 每次执行都会往 build/resources/main 里的清单里
     // 再追加一遍同一份 mixin 配置；而 processResources 一旦 UP-TO-DATE 就不会重新生成该文件，
-    // 于是从第二次开发运行起 fabric.mod.json 里就会出现重复的 mixin 配置，Fabric 直接拒绍启动：
+    // 于是从第二次开发运行起 fabric.mod.json 里就会出现重复的 mixin 配置，Fabric 直接拒绝启动：
     // Non-unique Mixin config name realdamage-fabric.mixins.json used by the mods realdamage and realdamage。
     // 正式产物的清单来自 generateModMetadata，不受影响；这里只让开发期的资源始终重做一遍。
     outputs.upToDateWhen { false }
@@ -275,43 +275,6 @@ if (devRunJvmArgs.isNotEmpty()) {
     tasks.matching { it.name == "runClient" || it.name == "runServer" }.configureEach {
         // Loom 的 runClient/runServer 与 MDG 的 RunGameTask 都是 JavaExec
         (this as JavaExec).jvmArgs(devRunJvmArgs)
-    }
-}
-
-// GameTest 必须在关掉网络压缩的服务端下跑。
-//
-// 为什么：GameTestHelper#makeMockServerPlayerInLevel 造出来的假玩家挂的是一条没有 channel 的
-// Connection，而 PlayerList#placeNewPlayer 会按 server.properties 里的 network-compression-threshold
-// 调 Connection#setupCompression，channel 为 null 时直接 NPE（原版自己的 gametest 也是关着压缩跑的）。
-// 这里在启动前把该属性钉死，而不是指望 run 目录里恰好有一份改过的 server.properties。
-// 这里手写文本而不引 java.util.Properties：Kotlin DSL 里 `java` 被 JavaPluginExtension 遮住了
-fun forceGametestServerProperties(gameDir: File) {
-    val key = "network-compression-threshold"
-    val required = "$key=-1"
-    val file = gameDir.resolve("server.properties")
-    val lines = (if (file.isFile) file.readText() else "").lines().toMutableList()
-    val index = lines.indexOfFirst { it.trimStart().startsWith("$key=") }
-    if (index >= 0) {
-        lines[index] = required
-    } else {
-        if (lines.isNotEmpty() && lines.last().isEmpty()) lines.removeAt(lines.lastIndex)
-        lines.add(required)
-        lines.add("")
-    }
-    file.parentFile.mkdirs()
-    file.writeText(lines.joinToString("\n"))
-}
-
-// MDG 的 gameTestServer 与 Fabric（靠 -Prealdamage.fabricGametest 把 runServer 变成 gametest 服务端）
-// 都要走一次这个预处理；gameDir 两边都是 <变体目录>/run
-tasks.matching {
-    it.name == "runGameTestServer" || (it.name == "runServer" && modstitch.isLoom)
-}.configureEach {
-    doFirst {
-        // Loom 的 runServer 平时也会跑，只有真的跑 gametest 时才该改配置
-        if (name == "runGameTestServer" || providers.gradleProperty("realdamage.fabricGametest").isPresent) {
-            forceGametestServerProperties(layout.projectDirectory.dir("run").asFile)
-        }
     }
 }
 
