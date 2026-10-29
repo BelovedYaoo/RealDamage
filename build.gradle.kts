@@ -271,7 +271,7 @@ if (modstitch.isLoom && minecraft.startsWith("26.")) {
 // "Cannot configure known indyBsms in a non-obfuscated environment"），而 26.x 本来也不需要
 // 重映射：类名就是 Mojang 名，mixin 注解值也无需改写。这正是官方 no-remap 插件
 // （net.fabricmc.fabric-loom）的效果——它的产物就是普通 jar。所以这里直接把 remapJar 关掉，
-// 并让 assemble 依赖普通 jar，保证 build/libs 里仍然是那份带 jar-in-jar 的完整产物。
+// 另加一个 noRemapJar 负责打包，保证 build/libs 里仍然是那份带 jar-in-jar 的完整产物。
 if (modstitch.isLoom && minecraft.startsWith("26.")) {
     tasks.named("remapJar") { enabled = false }
     // Loom 把普通 jar 放在 build/devlibs（带 -dev 分类），build/libs 里那份原本由 remapJar 产出。
