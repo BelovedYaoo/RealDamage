@@ -28,6 +28,22 @@ public interface TestSubject {
                  boolean invulnerable, boolean diamondArmor);
 
     /**
+     * 把玩家设成「创造/旁观模式那道闸」挡住的状态，其余条件（世界天数、真实伤害比例、满护甲）同
+     * {@link #prepare}。
+     *
+     * <p>为什么单独一个方法而不是给 {@link #prepare} 再加一个布尔量：这一条验证的是「注入点是否落在
+     * 原版那道闸的下游」，前置条件比其它断言更讲究——必须保证玩家<b>不</b>因伤害类型免疫，
+     * 否则「不掉血」可能来自另一道闸，断言就失去意义。把它做成独立入口，调用处一眼能看出区别。</p>
+     *
+     * <p>1.16.5 里创造与旁观共用同一个标记：{@code GameType#updatePlayerAbilities} 对 CREATIVE 和
+     * SPECTATOR 都写 {@code abilities.invulnerable = true}，因此测这一个标记等于同时覆盖两种模式。</p>
+     *
+     * @param day                世界天数（保护期判定用，须在保护期之外）
+     * @param constantProportion 固定比例真实伤害（百分数），用 100 才能看出「如果没被挡住会掉多少」
+     */
+    void prepareInvulnerableAbilities(int day, int constantProportion);
+
+    /**
      * 当前护甲值（用于断言「满护甲」这个前提真的成立）。
      */
     int armorValue();

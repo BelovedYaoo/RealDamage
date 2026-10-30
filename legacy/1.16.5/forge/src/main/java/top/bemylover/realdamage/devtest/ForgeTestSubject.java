@@ -64,6 +64,16 @@ final class ForgeTestSubject implements TestSubject {
     }
 
     @Override
+    public void prepareInvulnerableAbilities(int day, int constantProportion) {
+        // 保护期关闭（第二个参数 false：day 那一段判定不会生效，protectionDays 只是占位）
+        prepare(day, false, 100, constantProportion, false, true);
+        // 创造与旁观模式在 1.16.5 里共用这一个标记（GameType#updatePlayerAbilities 对两者都写 true），
+        // 而它在 PlayerEntity#hurt 里就早退了，所以 actuallyHurt 根本不会被执行。
+        // 这里直接设标记＝直接站在那道闸后面，而不是去模仿整个模式的切换。
+        player.abilities.invulnerable = true;
+    }
+
+    @Override
     public int armorValue() {
         return player.getArmorValue();
     }
