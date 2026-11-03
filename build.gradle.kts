@@ -363,12 +363,14 @@ tasks.withType<ProcessResources>().configureEach {
     exclude(if (modstitch.isLoom) "$modIdConst.mixins.json" else "$modIdConst-fabric.mixins.json")
 }
 
-// src/main/resources 不经过 Modstitch 的占位符渲染（那一套只作用于 templates），
-// 所以 mixins.json 里的 ${java_compatibility} 需要在这里单独展开；Fabric 那份同理
+// 两份 mixins.json 已放到 src/main/templates，由 Modstitch 的模板渲染统一展开
+// ${java_compatibility}（replacementProperties 里已注册）。
+//
+// 之前它们在 src/main/resources，靠 processResources 里的 filesMatching{ expand(...) } 展开，
+// 而 filesMatching 在 Gradle 内部会生成 MatchingCopyAction——文件集合是运行时由闭包算出来的，
+// IDEA 静态求值不了，于是每个变体都报一条「Cannot resolve resource filtering of MatchingCopyAction」。
+// 改为走 templates 后，processResources 上不再有任何条件性过滤，该告警随之消失。
 tasks.named<ProcessResources>("processResources") {
-    filesMatching(listOf("$modIdConst.mixins.json", "$modIdConst-fabric.mixins.json")) {
-        expand(mapOf("java_compatibility" to javaCompatibilityLevel))
-    }
     // Modstitch 的 applyMixinConfigToModMetadata 每次执行都会往 build/resources/main 里的清单里
     // 再追加一遍同一份 mixin 配置；而 processResources 一旦 UP-TO-DATE 就不会重新生成该文件，
     // 于是从第二次开发运行起 fabric.mod.json 里就会出现重复的 mixin 配置，Fabric 直接拒绝启动：
