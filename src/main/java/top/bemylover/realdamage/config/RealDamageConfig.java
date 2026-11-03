@@ -23,8 +23,6 @@ import java.util.List;
  *
  * <p>本类刻意不引用任何 Minecraft / 加载器类型：配置文件目录由各加载器入口点
  * 通过 {@link #init(Path)} 传入，因此配置与算法两层可以脱离游戏环境单独验证。</p>
- *
- * @author PrefersMin
  */
 public final class RealDamageConfig {
 

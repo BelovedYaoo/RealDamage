@@ -22,9 +22,6 @@ import top.bemylover.realdamage.RealDamage;
  * 无法改写数值，而本模组的手法正是「把原始伤害拆成真实伤害 + 剩余伤害」。
  * Fabric 的入口改由 {@code PlayerActuallyHurtMixin} 在 {@code Player#actuallyHurt} 里注入，
  * 结算逻辑与本类共用 {@link RealDamageCalculator}，详见该 mixin 的注释。</p>
- *
- * @author PrefersMin
- * @version 1.0
  */
 //? if forge {
 @Mod.EventBusSubscriber(modid = RealDamage.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)

@@ -12,8 +12,6 @@ import java.util.Objects;
  * <p>这里不再用 ForgeConfigSpec / ModConfigSpec 的值对象：那两者分属 Forge 与 NeoForge，
  * 会把配置类在源码层面绑死到具体加载器，Fabric 上无从复用；而 nightconfig 是 Forge/NeoForge
  * 自带的底层库，Fabric 侧把它打进产物即可，三个加载器因此能共用同一份配置实现。</p>
- *
- * @author PrefersMin
  */
 public abstract class ConfigValue<T> {
 

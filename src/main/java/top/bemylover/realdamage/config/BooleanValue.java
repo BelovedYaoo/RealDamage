@@ -2,8 +2,6 @@ package top.bemylover.realdamage.config;
 
 /**
  * 布尔配置项。
- *
- * @author PrefersMin
  */
 public final class BooleanValue extends ConfigValue<Boolean> {
 

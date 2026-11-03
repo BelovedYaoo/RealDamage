@@ -8,9 +8,6 @@ import top.bemylover.realdamage.config.RealDamageConfig;
 
 /**
  * 命令注册
- *
- * @author PrefersMin
- * @version 1.0
  */
 public class RealDamageCommon {
 

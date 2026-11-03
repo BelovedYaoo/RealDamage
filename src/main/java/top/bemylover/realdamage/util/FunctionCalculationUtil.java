@@ -16,9 +16,6 @@ import java.math.RoundingMode;
  * <p>与配置解耦：本类只接收 {@link RealDamageSettings}（加载器无关的只读快照），
  * 不再直接读 {@code RealDamageConfig} 的静态字段。求解结果封装成不可变的
  * {@link Parameters}，伤害计算阶段只做代入，不再反复迭代。</p>
- *
- * @author PrefersMin
- * @version 1.0
  */
 public final class FunctionCalculationUtil {
 

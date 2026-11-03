@@ -51,8 +51,6 @@ import java.nio.file.Path;
  * <p>断言用到的两组数值：全套钻石甲是护甲 20、韧性 8；对 10 点伤害，
  * 原版减免后只剩 {@code 10 * (1 - clamp(20 - 10/4, 4, 20)/25) = 3.0}。
  * 因此「掉 10」只可能来自绕甲的真实伤害，「掉 3」只可能是走完护甲结算的结果。</p>
- *
- * @author PrefersMin
  */
 public final class RealDamageGameTestSupport {
 

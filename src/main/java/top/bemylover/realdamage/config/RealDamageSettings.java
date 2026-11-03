@@ -7,8 +7,6 @@ package top.bemylover.realdamage.config;
  * <p>抽出接口的目的：函数计算工具类原先直接读 {@code RealDamageConfig.*} 静态字段，
  * 于是算法与配置类、配置类与加载器彼此纠缠在一起；改成「算法只认快照」之后，
  * 算法可以脱离 Minecraft 与加载器单独编译、单独验证，三个加载器也共享同一份实现。</p>
- *
- * @author PrefersMin
  */
 public interface RealDamageSettings {
 

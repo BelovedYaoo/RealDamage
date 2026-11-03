@@ -17,9 +17,6 @@ import top.bemylover.realdamage.util.FunctionCalculationUtil;
  * <p>Forge / NeoForge 由伤害事件调用（{@link RealDamageCalculationHandler}），
  * Fabric 由 mixin 调用（{@code PlayerActuallyHurtMixin}）。把逻辑收在这里，
  * 三个加载器的数值行为就只有一份实现，不会因为入口点不同而漂移。</p>
- *
- * @author PrefersMin
- * @version 1.0
  */
 public final class RealDamageCalculator {
 
