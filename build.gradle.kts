@@ -165,7 +165,7 @@ modstitch {
     metadata {
         modId = modIdConst
         modName = "Real Damage"
-        modVersion = "1.0.0"
+        modVersion = "1.2.0"
         modGroup = "top.bemylover.realdamage"
         modAuthor = "PrefersMin"
 
