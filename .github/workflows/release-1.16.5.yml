@@ -1,0 +1,79 @@
+name: 发版（1.16.5）
+
+# 1.16.5 走独立分支与独立构建（该年代的 ForgeGradle 4.1 与 NeoForm Runtime 不兼容，
+# 无法并入 main 的 Stonecutter 体系），因此也独立发版。
+# tag 用目录式前缀（沿用《发版与版本管理》里 monorepo 的 `<应用>/vX.Y.Z` 约定），
+# 与 main 上的 `vX.Y.Z` 区分开，两边互不干扰。
+on:
+  push:
+    tags:
+      - '1.16.5/v[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出（全量历史，注解 tag 校验需要 tag 对象）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 校验注解 tag
+        run: |
+          TYPE=$(git cat-file -t "$GITHUB_REF_NAME")
+          if [ "$TYPE" != "tag" ]; then
+            echo "::error::$GITHUB_REF_NAME 是轻量 tag（类型 $TYPE），发版要求注解 tag"
+            exit 1
+          fi
+          echo "注解 tag 校验通过：$GITHUB_REF_NAME"
+
+      - name: 校验版本号与两个构建脚本一致
+        run: |
+          # 版本号只认 tag 的最后一段；forge 与 fabric 是两个独立构建，必须同时对齐，
+          # 否则附到同一个 Release 上的产物文件名会与 tag 对不上
+          TAG_VERSION="${GITHUB_REF_NAME##*/v}"
+          for app in forge fabric; do
+            BUILD_VERSION=$(grep -oP "version\s*=\s*'\K[^']+" "legacy/1.16.5/$app/build.gradle" | head -1)
+            if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
+              echo "::error::$app 的 version $BUILD_VERSION 与 tag 版本 $TAG_VERSION 不一致"
+              exit 1
+            fi
+          done
+          echo "版本一致：$TAG_VERSION"
+          echo "TAG_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+
+      - name: 构建 Forge（JDK 8）
+        # ForgeGradle 4.1 + Gradle 6.9.4 只支持到 Java 11 一带，按该分支既有做法用 JDK 8
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '8'
+      - run: cd legacy/1.16.5/forge && ./gradlew build --no-daemon
+
+      - name: 构建 Fabric（JDK 17）
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - run: cd legacy/1.16.5/fabric && ./gradlew build --no-daemon
+
+      - name: 汇总产物
+        run: |
+          # 两个产物自带唯一名（realdamage-1.16.5-<加载器>-<版本>.jar），只需排除开发期薄 jar
+          mkdir -p dist
+          find legacy/1.16.5 -path '*/build/libs/*.jar' \
+            ! -name '*-dev*' ! -name '*-sources*' -exec cp {} dist/ \;
+          echo "共 $(ls dist | wc -l) 个产物："
+          ls -la dist
+
+      - name: 创建 Release 并附上产物
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*.jar
