@@ -1,0 +1,92 @@
+name: 发版
+
+# 推注解 tag 即发版：构建全部变体，把产物附到同名 GitHub Release 上。
+# 沿用《发版与版本管理》的约定——注解 tag、tag 指向发版提交、版本号与清单一致、tag 不复用。
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+
+# 创建 Release 需要写权限；其余一律只读
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出（取全量历史，注解 tag 的校验需要 tag 对象）
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 校验注解 tag
+        run: |
+          # 轻量 tag 的 cat-file 类型是 commit，注解 tag 才是 tag；约定只接受注解 tag
+          TYPE=$(git cat-file -t "$GITHUB_REF_NAME")
+          if [ "$TYPE" != "tag" ]; then
+            echo "::error::$GITHUB_REF_NAME 是轻量 tag（类型 $TYPE），发版要求注解 tag"
+            exit 1
+          fi
+          echo "注解 tag 校验通过：$GITHUB_REF_NAME"
+
+      - name: 校验 tag 指向发版分支的提交
+        run: |
+          # tag 必须落在 main 的历史上，避免误从特性分支打 tag 发版
+          if ! git merge-base --is-ancestor "$GITHUB_REF_NAME^{commit}" origin/main; then
+            echo "::error::$GITHUB_REF_NAME 指向的提交不在 main 上"
+            exit 1
+          fi
+          echo "tag 指向的提交在 main 上"
+
+      - name: 校验版本号与构建脚本一致
+        run: |
+          # 版本号只认 tag；构建脚本里的 modVersion 必须与之一致，否则产物文件名会与 tag 对不上
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          BUILD_VERSION=$(grep -oP 'modVersion\s*=\s*"\K[^"]+' build.gradle.kts | head -1)
+          if [ "$TAG_VERSION" != "$BUILD_VERSION" ]; then
+            echo "::error::tag 版本 $TAG_VERSION 与 build.gradle.kts 的 modVersion $BUILD_VERSION 不一致"
+            exit 1
+          fi
+          echo "版本一致：$TAG_VERSION"
+          echo "TAG_VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+
+      - name: 安装 JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: 准备 Gradle（含构建缓存）
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 构建全部变体
+        # chiseledBuild 会为每个变体生成源码再构建；单独构建某个变体会因缺源码而产出空 jar
+        run: ./gradlew chiseledBuild --no-daemon
+
+      - name: 汇总产物并唯一化命名
+        run: |
+          # 各变体的产物同名（realdamage-<版本>.jar），必须按「MC 版本-加载器」重命名，
+          # 否则附到同一个 Release 上会互相覆盖
+          mkdir -p dist
+          for dir in versions/*/; do
+            variant=$(basename "$dir")
+            jar=$(find "$dir/build/libs" -maxdepth 1 -name 'realdamage-*.jar' \
+                  ! -name '*-slim*' ! -name '*-dev*' 2>/dev/null | head -1)
+            if [ -z "$jar" ]; then
+              echo "::error::$variant 没有产物"
+              exit 1
+            fi
+            cp "$jar" "dist/realdamage-${variant}-${TAG_VERSION}.jar"
+          done
+          echo "共 $(ls dist | wc -l) 个产物："
+          ls -la dist
+
+      - name: 创建 Release 并附上产物
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            dist/*.jar
