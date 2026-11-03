@@ -23,9 +23,12 @@ jobs:
 
       - name: 校验注解 tag
         run: |
-          TYPE=$(git cat-file -t "$GITHUB_REF_NAME")
-          if [ "$TYPE" != "tag" ]; then
-            echo "::error::$GITHUB_REF_NAME 是轻量 tag（类型 $TYPE），发版要求注解 tag"
+          # checkout 默认不取 tag 对象（fetch-tags 为 false），本地 cat-file 判断不出注解 tag；
+          # 且本分支 tag 含 /，API 路径需转义，故用 ls-remote 的剥离行判定：
+          # 注解 tag 能查到 ^{} 剥离提交，轻量 tag 查不到
+          PEELED=$(git ls-remote origin "refs/tags/$GITHUB_REF_NAME^{}")
+          if [ -z "$PEELED" ]; then
+            echo "::error::$GITHUB_REF_NAME 是轻量 tag，发版要求注解 tag"
             exit 1
           fi
           echo "注解 tag 校验通过：$GITHUB_REF_NAME"
