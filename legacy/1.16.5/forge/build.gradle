@@ -5,7 +5,7 @@ plugins {
     id 'net.minecraftforge.gradle' version '4.1.16'
 }
 
-version = '1.0.0'
+version = '1.2.0'
 group = 'top.bemylover.realdamage'
 archivesBaseName = 'realdamage-1.16.5-forge'
 
