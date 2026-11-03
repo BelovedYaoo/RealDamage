@@ -15,25 +15,26 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
-      - name: 检出（取全量历史，注解 tag 的校验需要 tag 对象）
+      - name: 检出（取全量历史，判断 tag 指向需要祖先关系）
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: 校验注解 tag
+      - name: 校验注解 tag 与指向
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          # 轻量 tag 的 cat-file 类型是 commit，注解 tag 才是 tag；约定只接受注解 tag
-          TYPE=$(git cat-file -t "$GITHUB_REF_NAME")
-          if [ "$TYPE" != "tag" ]; then
-            echo "::error::$GITHUB_REF_NAME 是轻量 tag（类型 $TYPE），发版要求注解 tag"
+          # checkout 默认不取 tag 对象（fetch-tags 默认为 false），本地 cat-file 判断不出注解 tag，
+          # 因此以远端 API 为准：注解 tag 的 object.type 是 tag，轻量 tag 是 commit
+          OBJ_TYPE=$(gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/$GITHUB_REF_NAME" --jq '.object.type')
+          if [ "$OBJ_TYPE" != "tag" ]; then
+            echo "::error::$GITHUB_REF_NAME 是轻量 tag（object.type=$OBJ_TYPE），发版要求注解 tag"
             exit 1
           fi
           echo "注解 tag 校验通过：$GITHUB_REF_NAME"
-
-      - name: 校验 tag 指向发版分支的提交
-        run: |
-          # tag 必须落在 main 的历史上，避免误从特性分支打 tag 发版
-          if ! git merge-base --is-ancestor "$GITHUB_REF_NAME^{commit}" origin/main; then
+          # GITHUB_SHA 即该 tag 指向的提交；必须在 main 上，避免误从特性分支打 tag 发版
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "::error::$GITHUB_REF_NAME 指向的提交不在 main 上"
             exit 1
           fi
