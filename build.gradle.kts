@@ -264,7 +264,27 @@ if (modstitch.isLoom && minecraft.startsWith("26.")) {
     // 这个 Property 在 Loom 构造扩展时就已经 finalizeValue 了，set 会报
     // 「The value for this property is final and cannot be changed any further」，
     // 只能把整个属性对象换成一个已经定好值的新对象（Loom 每次都是读该字段，不做缓存）
-    disableObfuscationField.set(loomExtension, objects.property(Boolean::class.java).value(true))
+    fun setDisableObfuscation(value: Boolean) {
+        disableObfuscationField.set(loomExtension, objects.property(Boolean::class.java).value(value))
+    }
+    setDisableObfuscation(true)
+
+    // Loom 在应用 fabric-loom 插件时就按「当时还是 false」的标志注册了 generateRemapClasspath，
+    // 而 register 出来的 provider 是懒的：IDEA 同步或 tasks --all 枚举任务时才真正实例化。
+    // 到那时标志已经是 true，GenerateRemapClasspathTask 的构造函数会去读 remap 配置并抛
+    // 「Cannot get remap configurations in a non-obfuscated environment」——失败发生在构造阶段，
+    // 所以对任务设置 enabled = false 也来不及。这里等 Loom 在 afterEvaluate 里装配完
+    // Minecraft provider 之后，临时按「混淆环境」把任务完整构造出来，再恢复标志并禁用任务：
+    // 非混淆环境本来就没有需要写进 remap classpath 的内容，保留这个任务名只是为了让
+    // IDE/任务枚举看到它时不再触发构造异常。
+    afterEvaluate {
+        setDisableObfuscation(false)
+        try {
+            tasks.named("generateRemapClasspath").get().enabled = false
+        } finally {
+            setDisableObfuscation(true)
+        }
+    }
 }
 
 // 非混淆环境下 Loom 的 remapJar 连属性都读不了（knownIndyBsms 会抛
